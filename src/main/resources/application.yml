@@ -23,7 +23,7 @@ jwt:
   expiration-minutes: ${JWT_EXPIRATION_MINUTES}
 
 refresh:
-  expiration-days: ${REFRESH_EXPIRATION_DAYS}
+  expiration-days: ${REFRESH_EXPIRATION_DAYS:7}
 
 
 azure:
