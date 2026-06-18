@@ -3,10 +3,12 @@ package com.escuelaing.auth.service;
 import com.escuelaing.auth.dto.response.TokenResponse;
 import com.escuelaing.auth.dto.usuario.FindOrCreateUserRequest;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
+import com.escuelaing.auth.exception.InvalidDomainException;
 import com.escuelaing.auth.exception.InvalidRefreshTokenException;
 import com.escuelaing.auth.mock.MockUsuarioClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -20,6 +22,10 @@ public class AuthService {
     private final MockUsuarioClient      mockUsuarioClient;
     private final JwtService             jwtService;
     private final RefreshTokenService    refreshTokenService;
+    private final OtpService             otpService;
+
+    @Value("${security.allowed-domain}")
+    private String allowedDomain;
 
     /**
      * Login Microsoft completo.
@@ -38,6 +44,36 @@ public class AuthService {
                 )
         );
 
+        return buildTokenResponse(usuario);
+    }
+
+    /**
+     * Solicita un código OTP para el correo institucional.
+     * Segunda opción de ingreso, independiente de Microsoft OAuth.
+     */
+    public void requestOtp(String email) {
+        validateInstitutionalDomain(email);
+        otpService.requestOtp(email);
+    }
+
+    /**
+     * Login con OTP: verifica el código y emite JWT + refresh token.
+     */
+    public TokenResponse loginOtp(String email, String code) {
+
+        validateInstitutionalDomain(email);
+        otpService.verify(email, code);
+
+        String normalized = email.toLowerCase();
+        UsuarioResponse usuario = mockUsuarioClient.findOrCreate(
+                new FindOrCreateUserRequest(
+                        normalized,
+                        deriveName(normalized),
+                        null
+                )
+        );
+
+        log.info("OTP login successful for email={}", normalized);
         return buildTokenResponse(usuario);
     }
 
@@ -113,6 +149,19 @@ public class AuthService {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private void validateInstitutionalDomain(String email) {
+        if (email == null || !email.toLowerCase().endsWith(allowedDomain)) {
+            throw new InvalidDomainException(
+                    "Only institutional accounts are allowed"
+            );
+        }
+    }
+
+    private String deriveName(String email) {
+        int at = email.indexOf('@');
+        return at > 0 ? email.substring(0, at) : email;
+    }
 
     private TokenResponse buildTokenResponse(UsuarioResponse usuario) {
 

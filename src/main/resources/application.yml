@@ -25,6 +25,13 @@ jwt:
 refresh:
   expiration-days: ${REFRESH_EXPIRATION_DAYS:7}
 
+otp:
+  length: ${OTP_LENGTH:6}
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:5}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  resend-cooldown-seconds: ${OTP_RESEND_COOLDOWN_SECONDS:60}
+  secret: ${OTP_SECRET:${JWT_SECRET}}
+
 
 azure:
   client-id: ${AZURE_CLIENT_ID}
