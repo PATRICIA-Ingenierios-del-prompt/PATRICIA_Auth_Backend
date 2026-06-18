@@ -215,9 +215,7 @@ public class MicrosoftOAuthService {
             String email
     ) {
 
-        if (!email.endsWith(
-                allowedDomain
-        )) {
+        if (!AuthService.isInstitutionalEmail(email, allowedDomain)) {
 
             throw new InvalidDomainException(
                     "Only institutional student accounts are allowed"
