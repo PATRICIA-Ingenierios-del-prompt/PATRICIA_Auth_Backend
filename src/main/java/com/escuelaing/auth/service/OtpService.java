@@ -2,6 +2,7 @@ package com.escuelaing.auth.service;
 
 import com.escuelaing.auth.exception.InvalidOtpException;
 import com.escuelaing.auth.exception.OtpRequestException;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,6 +39,13 @@ public class OtpService {
     private final OtpSender otpSender;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    /**
+     * Hash de relleno usado para comparar en tiempo constante cuando no existe
+     * un OTP almacenado. Evita que el camino "sin OTP" sea más rápido (lo que
+     * permitiría enumerar correos o guiar un ataque por tiempos).
+     */
+    private String dummyHash;
+
     @Value("${otp.length:6}")
     private int otpLength;
 
@@ -56,6 +64,12 @@ public class OtpService {
     public OtpService(StringRedisTemplate redisTemplate, OtpSender otpSender) {
         this.redisTemplate = redisTemplate;
         this.otpSender = otpSender;
+    }
+
+    @PostConstruct
+    void init() {
+        // Pre-calcula un hash de relleno con la misma forma que un hash real.
+        this.dummyHash = hash("__no_otp__");
     }
 
     /**
@@ -106,12 +120,10 @@ public class OtpService {
         String otpKey      = OTP_PREFIX + normalized;
         String attemptsKey = OTP_ATTEMPTS_PREFIX + normalized;
 
-        String stored = redisTemplate.opsForValue().get(otpKey);
-
-        if (stored == null) {
-            throw new InvalidOtpException("Código inválido o expirado");
-        }
-
+        // 1. Contabilizar el intento SIEMPRE, exista o no un OTP. Así el
+        //    número de intentos no depende de si el correo tiene un código
+        //    activo (evita enumeración) y el límite anti fuerza bruta aplica
+        //    de forma uniforme.
         Long attempts = redisTemplate.opsForValue().increment(attemptsKey);
         if (attempts != null && attempts == 1L) {
             redisTemplate.expire(
@@ -120,19 +132,30 @@ public class OtpService {
             );
         }
 
-        if (attempts != null && attempts > maxAttempts) {
+        // 2. Calcular el hash del código y comparar en tiempo constante SIEMPRE,
+        //    incluso si no hay OTP almacenado (se compara contra un hash de
+        //    relleno). El tiempo de respuesta es el mismo en todos los casos,
+        //    por lo que un atacante no puede usar los tiempos para guiarse.
+        String stored    = redisTemplate.opsForValue().get(otpKey);
+        String candidate = hash(code);
+        boolean matches  = constantTimeEquals(
+                stored != null ? stored : dummyHash,
+                candidate
+        ) && stored != null;
+
+        // 3. Límite de intentos superado: invalidar y rechazar con el mismo
+        //    mensaje genérico para no revelar el estado interno.
+        if (attempts == null || attempts > maxAttempts) {
             redisTemplate.delete(otpKey);
             redisTemplate.delete(attemptsKey);
-            throw new InvalidOtpException(
-                    "Demasiados intentos. Solicita un nuevo código"
-            );
-        }
-
-        if (!constantTimeEquals(stored, hash(code))) {
             throw new InvalidOtpException("Código inválido o expirado");
         }
 
-        // Éxito: invalidar (un solo uso)
+        if (!matches) {
+            throw new InvalidOtpException("Código inválido o expirado");
+        }
+
+        // 4. Éxito: invalidar (un solo uso).
         redisTemplate.delete(otpKey);
         redisTemplate.delete(attemptsKey);
 

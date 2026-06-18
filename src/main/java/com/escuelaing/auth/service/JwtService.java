@@ -3,6 +3,7 @@ package com.escuelaing.auth.service;
 import com.escuelaing.auth.config.JwtProperties;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -14,6 +15,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -65,20 +67,35 @@ public class JwtService {
 
     /**
      * Introspección para el endpoint /auth/validate.
-     * Nunca lanza excepción: devuelve { valid: false } si algo falla.
+     * Nunca lanza excepción: devuelve { valid: false } si la firma es inválida,
+     * el token expiró o está malformado.
+     *
+     * Verifica explícitamente firma + expiración (vía {@code parseSignedClaims})
+     * y exige que el claim {@code sub} esté presente. Usa un mapa que admite
+     * valores nulos para no fallar si faltan claims opcionales.
      */
     public Map<String, Object> introspect(String token) {
         try {
             Claims claims = validateAndExtract(token);
-            return Map.of(
-                    "valid", true,
-                    "sub",   claims.getSubject(),
-                    "email", claims.get("email", String.class),
-                    "roles", claims.get("roles", List.class)
-            );
+
+            if (claims.getSubject() == null) {
+                log.debug("Token introspection failed: missing subject");
+                return Map.of("valid", false);
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("valid", true);
+            result.put("sub", claims.getSubject());
+            result.put("email", claims.get("email", String.class));
+            result.put("roles", claims.get("roles", List.class));
+            return result;
+
+        } catch (ExpiredJwtException e) {
+            log.debug("Token introspection failed: expired");
+            return Map.of("valid", false, "reason", "expired");
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("Token introspection failed: {}", e.getMessage());
-            return Map.of("valid", false);
+            return Map.of("valid", false, "reason", "invalid");
         }
     }
 
