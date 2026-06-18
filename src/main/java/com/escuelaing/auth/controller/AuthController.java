@@ -2,6 +2,8 @@ package com.escuelaing.auth.controller;
 
 import com.escuelaing.auth.dto.request.LogoutRequest;
 import com.escuelaing.auth.dto.request.MicrosoftCodeRequest;
+import com.escuelaing.auth.dto.request.OtpRequestRequest;
+import com.escuelaing.auth.dto.request.OtpVerifyRequest;
 import com.escuelaing.auth.dto.request.RefreshTokenRequest;
 import com.escuelaing.auth.dto.request.ValidateTokenRequest;
 import com.escuelaing.auth.dto.response.TokenResponse;
@@ -31,6 +33,29 @@ public class AuthController {
             @Valid @RequestBody MicrosoftCodeRequest request
     ) {
         return authService.loginMicrosoft(request.code());
+    }
+
+    /**
+     * Solicita el envío de un código OTP al correo institucional.
+     * Primera fase del login por OTP (segunda opción de ingreso).
+     */
+    @PostMapping("/otp/request")
+    public ResponseEntity<Void> requestOtp(
+            @Valid @RequestBody OtpRequestRequest request
+    ) {
+        authService.requestOtp(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Verifica el código OTP y emite JWT + refresh token.
+     * Segunda fase del login por OTP.
+     */
+    @PostMapping("/otp/verify")
+    public TokenResponse verifyOtp(
+            @Valid @RequestBody OtpVerifyRequest request
+    ) {
+        return authService.loginOtp(request.email(), request.code());
     }
 
     /**
