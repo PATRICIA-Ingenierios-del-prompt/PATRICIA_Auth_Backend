@@ -94,11 +94,13 @@ public class RefreshTokenService {
      * Invalida TODAS las sesiones del usuario.
      * Usado en logout forzado y cierre administrativo.
      */
-    public void invalidateAllSessions(String userId) {
+    public long invalidateAllSessions(String userId) {
 
         String userTokensKey = USER_TOKENS_PREFIX + userId;
         Set<String> tokens = redisTemplate.opsForSet()
                 .members(userTokensKey);
+
+        long invalidated = tokens == null ? 0 : tokens.size();
 
         if (tokens != null && !tokens.isEmpty()) {
             tokens.forEach(t ->
@@ -107,6 +109,8 @@ public class RefreshTokenService {
         }
 
         redisTemplate.delete(userTokensKey);
-        log.info("All sessions invalidated for userId={}", userId);
+        log.info("All sessions invalidated for userId={}, count={}",
+                userId, invalidated);
+        return invalidated;
     }
 }
