@@ -13,7 +13,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
@@ -23,12 +27,8 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
-    private final JwtService  jwtService;
+    private final JwtService jwtService;
 
-    /**
-     * Login con Microsoft OAuth2.
-     * Recibe el authorization_code y devuelve JWT + refresh token.
-     */
     @PostMapping("/login/microsoft")
     public TokenResponse loginMicrosoft(
             @Valid @RequestBody MicrosoftCodeRequest request,
@@ -40,10 +40,6 @@ public class AuthController {
         );
     }
 
-    /**
-     * Solicita el envío de un código OTP al correo institucional.
-     * Primera fase del login por OTP (segunda opción de ingreso).
-     */
     @PostMapping("/otp/request")
     public ResponseEntity<Void> requestOtp(
             @Valid @RequestBody OtpRequestRequest request
@@ -52,10 +48,6 @@ public class AuthController {
         return ResponseEntity.accepted().build();
     }
 
-    /**
-     * Verifica el código OTP y emite JWT + refresh token.
-     * Segunda fase del login por OTP.
-     */
     @PostMapping("/otp/verify")
     public TokenResponse verifyOtp(
             @Valid @RequestBody OtpVerifyRequest request,
@@ -68,32 +60,6 @@ public class AuthController {
         );
     }
 
-    /**
-     * Solicita el envío de un código OTP al correo institucional.
-     * Primera fase del login por OTP (segunda opción de ingreso).
-     */
-    @PostMapping("/otp/request")
-    public ResponseEntity<Void> requestOtp(
-            @Valid @RequestBody OtpRequestRequest request
-    ) {
-        authService.requestOtp(request.email());
-        return ResponseEntity.accepted().build();
-    }
-
-    /**
-     * Verifica el código OTP y emite JWT + refresh token.
-     * Segunda fase del login por OTP.
-     */
-    @PostMapping("/otp/verify")
-    public TokenResponse verifyOtp(
-            @Valid @RequestBody OtpVerifyRequest request
-    ) {
-        return authService.loginOtp(request.email(), request.code());
-    }
-
-    /**
-     * Refresco de sesión con rotación obligatoria del refresh token.
-     */
     @PostMapping("/refresh")
     public TokenResponse refresh(
             @Valid @RequestBody RefreshTokenRequest request
@@ -101,10 +67,6 @@ public class AuthController {
         return authService.refresh(request.refreshToken());
     }
 
-    /**
-     * Validación / introspección de JWT propio.
-     * Útil para debug y pruebas Swagger.
-     */
     @PostMapping("/validate")
     public Map<String, Object> validate(
             @Valid @RequestBody ValidateTokenRequest request
@@ -112,10 +74,6 @@ public class AuthController {
         return jwtService.introspect(request.token());
     }
 
-    /**
-     * Logout.
-     * Con header X-Forced: true invalida TODAS las sesiones del usuario.
-     */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @Valid @RequestBody LogoutRequest request,
