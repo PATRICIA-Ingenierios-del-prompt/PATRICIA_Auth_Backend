@@ -9,6 +9,7 @@ import com.escuelaing.auth.dto.request.ValidateTokenRequest;
 import com.escuelaing.auth.dto.response.TokenResponse;
 import com.escuelaing.auth.service.AuthService;
 import com.escuelaing.auth.service.JwtService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +31,13 @@ public class AuthController {
      */
     @PostMapping("/login/microsoft")
     public TokenResponse loginMicrosoft(
-            @Valid @RequestBody MicrosoftCodeRequest request
+            @Valid @RequestBody MicrosoftCodeRequest request,
+            HttpServletRequest httpRequest
     ) {
-        return authService.loginMicrosoft(request.code());
+        return authService.loginMicrosoft(
+                request.code(),
+                clientIp(httpRequest)
+        );
     }
 
     /**
@@ -53,9 +58,14 @@ public class AuthController {
      */
     @PostMapping("/otp/verify")
     public TokenResponse verifyOtp(
-            @Valid @RequestBody OtpVerifyRequest request
+            @Valid @RequestBody OtpVerifyRequest request,
+            HttpServletRequest httpRequest
     ) {
-        return authService.loginOtp(request.email(), request.code());
+        return authService.loginOtp(
+                request.email(),
+                request.code(),
+                clientIp(httpRequest)
+        );
     }
 
     /**
@@ -90,5 +100,13 @@ public class AuthController {
     ) {
         authService.logout(request.refreshToken(), forced);
         return ResponseEntity.noContent().build();
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

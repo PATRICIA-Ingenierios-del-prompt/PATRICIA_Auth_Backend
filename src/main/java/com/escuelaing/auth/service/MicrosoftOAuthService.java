@@ -6,8 +6,8 @@ import com.escuelaing.auth.exception.InvalidDomainException;
 import com.escuelaing.auth.exception.InvalidTenantException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -21,49 +21,22 @@ import java.util.Map;
 public class MicrosoftOAuthService {
 
     private final RestClient restClient;
-
     private final AzureProperties azureProperties;
 
-    @Value("${security.allowed-domain}")
-    private String allowedDomain;
-    @Value("${auth.dev-mode:false}")
-    private boolean devMode;
-
-    /**
-     * Intercambia el authorization code por tokens Microsoft
-     * y valida el ID Token criptográficamente.
-     *
-     * Flujo:
-     * code -> token exchange -> validate signature
-     * -> validate tid -> validate domain
-     */
-    public Map<String, Object> authenticate(
-            String authorizationCode
-    ) {
+    public Map<String, Object> authenticate(String authorizationCode) {
 
         log.info("Microsoft authentication started");
-        log.info("Dev mode enabled: {}", devMode);
 
         MicrosoftTokenResponse response =
                 exchangeCodeForTokens(authorizationCode);
 
-        Jwt jwt = validateMicrosoftIdToken(
-                response.idToken()
-        );
-
-        if (!devMode) {
-            validateTenant(jwt);
-        }
+        Jwt jwt = validateMicrosoftIdToken(response.idToken());
 
         String email = extractEmail(jwt);
 
         log.info("Microsoft email: {}", email);
         log.info("Microsoft tenant: {}",
                 jwt.getClaimAsString("tid"));
-
-        if (!devMode) {
-            validateInstitutionalDomain(email);
-        }
 
         return Map.of(
                 "email", email,
@@ -72,27 +45,20 @@ public class MicrosoftOAuthService {
         );
     }
 
-    private MicrosoftTokenResponse exchangeCodeForTokens(
-            String code
-    ) {
+    private MicrosoftTokenResponse exchangeCodeForTokens(String code) {
 
         LinkedMultiValueMap<String, String> body =
                 new LinkedMultiValueMap<>();
 
         body.add("client_id",
                 azureProperties.getClientId());
-
         body.add("client_secret",
                 azureProperties.getClientSecret());
-
         body.add("grant_type",
                 "authorization_code");
-
         body.add("code", code);
-
         body.add("redirect_uri",
                 azureProperties.getRedirectUri());
-
         body.add("scope",
                 "openid profile email");
 
@@ -103,34 +69,26 @@ public class MicrosoftOAuthService {
                 )
                 .body(body)
                 .retrieve()
-                .body(
-                        MicrosoftTokenResponse.class
-                );
+                .body(MicrosoftTokenResponse.class);
     }
 
-    private Jwt validateMicrosoftIdToken(
-            String idToken
-    ) {
+    private Jwt validateMicrosoftIdToken(String idToken) {
 
         NimbusJwtDecoder decoder =
                 NimbusJwtDecoder.withJwkSetUri(
                         azureProperties.getJwksUri()
                 ).build();
+        decoder.setJwtValidator(JwtValidators.createDefault());
 
         Jwt jwt = decoder.decode(idToken);
 
         validateAudience(jwt);
-
-        if (!devMode) {
-            validateIssuer(jwt);
-        }
+        validateIssuerMatchesTokenTenant(jwt);
 
         return jwt;
     }
 
-    private void validateAudience(
-            Jwt jwt
-    ) {
+    private void validateAudience(Jwt jwt) {
 
         if (jwt.getAudience() == null
                 || jwt.getAudience().isEmpty()) {
@@ -140,66 +98,53 @@ public class MicrosoftOAuthService {
             );
         }
 
-        String aud =
-                jwt.getAudience().get(0);
+        String aud = jwt.getAudience().get(0);
 
-        if (!azureProperties.getClientId()
-                .equals(aud)) {
-
+        if (!azureProperties.getClientId().equals(aud)) {
             throw new InvalidTenantException(
                     "Invalid audience"
             );
         }
     }
 
-    private void validateIssuer(
-            Jwt jwt
-    ) {
+    private void validateIssuerMatchesTokenTenant(Jwt jwt) {
+
+        String tid = jwt.getClaimAsString("tid");
+
+        if (tid == null || tid.isBlank()) {
+            throw new InvalidTenantException(
+                    "Tenant claim missing"
+            );
+        }
+
+        if (jwt.getIssuer() == null) {
+            throw new InvalidTenantException(
+                    "Issuer claim missing"
+            );
+        }
 
         String expectedIssuer =
                 "https://login.microsoftonline.com/"
-                        + azureProperties.getTenantId()
+                        + tid
                         + "/v2.0";
 
-        String issuer =
-                jwt.getIssuer().toString();
+        String issuer = jwt.getIssuer().toString();
 
         if (!expectedIssuer.equals(issuer)) {
-
             throw new InvalidTenantException(
                     "Invalid issuer"
             );
         }
     }
 
-    private void validateTenant(
-            Jwt jwt
-    ) {
+    private String extractEmail(Jwt jwt) {
 
-        String tid =
-                jwt.getClaimAsString("tid");
-
-        if (!azureProperties.getTenantId()
-                .equals(tid)) {
-
-            throw new InvalidTenantException(
-                    "Only Escuela Colombiana de Ingeniería accounts are allowed"
-            );
-        }
-    }
-
-    private String extractEmail(
-            Jwt jwt
-    ) {
-
-        String email =
-                jwt.getClaimAsString("email");
+        String email = jwt.getClaimAsString("email");
 
         if (email == null) {
-            email =
-                    jwt.getClaimAsString(
-                            "preferred_username"
-                    );
+            email = jwt.getClaimAsString(
+                    "preferred_username"
+            );
         }
 
         if (email == null) {
@@ -210,6 +155,7 @@ public class MicrosoftOAuthService {
 
         return email.toLowerCase();
     }
+<<<<<<< Updated upstream
 
     private void validateInstitutionalDomain(
             String email
@@ -223,3 +169,6 @@ public class MicrosoftOAuthService {
         }
     }
 }
+=======
+}
+>>>>>>> Stashed changes

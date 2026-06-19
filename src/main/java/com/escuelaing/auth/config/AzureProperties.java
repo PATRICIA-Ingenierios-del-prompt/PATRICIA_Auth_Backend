@@ -15,8 +15,6 @@ public class AzureProperties {
 
     private String clientSecret;
 
-    private String tenantId;
-
     private String redirectUri;
 
     private String tokenUrl;
