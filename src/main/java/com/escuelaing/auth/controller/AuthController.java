@@ -69,6 +69,29 @@ public class AuthController {
     }
 
     /**
+     * Solicita el envío de un código OTP al correo institucional.
+     * Primera fase del login por OTP (segunda opción de ingreso).
+     */
+    @PostMapping("/otp/request")
+    public ResponseEntity<Void> requestOtp(
+            @Valid @RequestBody OtpRequestRequest request
+    ) {
+        authService.requestOtp(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Verifica el código OTP y emite JWT + refresh token.
+     * Segunda fase del login por OTP.
+     */
+    @PostMapping("/otp/verify")
+    public TokenResponse verifyOtp(
+            @Valid @RequestBody OtpVerifyRequest request
+    ) {
+        return authService.loginOtp(request.email(), request.code());
+    }
+
+    /**
      * Refresco de sesión con rotación obligatoria del refresh token.
      */
     @PostMapping("/refresh")
