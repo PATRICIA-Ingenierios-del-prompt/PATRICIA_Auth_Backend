@@ -155,20 +155,4 @@ public class MicrosoftOAuthService {
 
         return email.toLowerCase();
     }
-<<<<<<< Updated upstream
-
-    private void validateInstitutionalDomain(
-            String email
-    ) {
-
-        if (!AuthService.isInstitutionalEmail(email, allowedDomain)) {
-
-            throw new InvalidDomainException(
-                    "Only institutional student accounts are allowed"
-            );
-        }
-    }
 }
-=======
-}
->>>>>>> Stashed changes

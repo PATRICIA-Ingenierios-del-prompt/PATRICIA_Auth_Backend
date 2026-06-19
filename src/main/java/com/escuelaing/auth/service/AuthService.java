@@ -160,41 +160,6 @@ public class AuthService {
         log.info("Admin forced close all sessions for userId={}", userId);
     }
 
-<<<<<<< Updated upstream
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private void validateInstitutionalDomain(String email) {
-        if (!isInstitutionalEmail(email, allowedDomain)) {
-            throw new InvalidDomainException(
-                    "Only institutional accounts are allowed"
-            );
-        }
-    }
-
-    /**
-     * Valida que el correo pertenezca al dominio institucional o a uno de sus
-     * subdominios. Compara únicamente la parte de dominio (después de '@') para
-     * evitar bypass del tipo {@code usuario@evilescuelaing.edu.co}, que con un
-     * simple {@code endsWith} sería aceptado.
-     */
-    static boolean isInstitutionalEmail(String email, String allowedDomain) {
-        if (email == null) {
-            return false;
-        }
-        String lower = email.toLowerCase().trim();
-        int at = lower.indexOf('@');
-        if (at < 0 || at == lower.length() - 1) {
-            return false;
-        }
-        String domain = lower.substring(at + 1);
-        String allowed = allowedDomain.toLowerCase();
-        return domain.equals(allowed) || domain.endsWith("." + allowed);
-    }
-
-=======
->>>>>>> Stashed changes
     private String deriveName(String email) {
         int at = email.indexOf('@');
         return at > 0 ? email.substring(0, at) : email;
