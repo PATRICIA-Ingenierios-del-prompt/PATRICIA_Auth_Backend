@@ -3,7 +3,7 @@ package com.escuelaing.auth.messaging;
 import com.escuelaing.auth.dto.event.AuthEvent;
 import com.escuelaing.auth.dto.usuario.FindOrCreateUserRequest;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
-import com.escuelaing.auth.mock.MockUsuarioClient;
+import com.escuelaing.auth.client.UsuarioServiceClient;
 import com.escuelaing.auth.service.AuthService;
 import com.escuelaing.auth.service.DomainValidationService;
 import com.escuelaing.auth.service.JwtService;
@@ -34,7 +34,7 @@ class AuthEventPublisherTest {
     void publishesSesionIniciadaAfterSuccessfulMicrosoftLogin() {
         MicrosoftOAuthService microsoftOAuthService =
                 mock(MicrosoftOAuthService.class);
-        MockUsuarioClient mockUsuarioClient = mock(MockUsuarioClient.class);
+        UsuarioServiceClient usuarioServiceClient = mock(UsuarioServiceClient.class);
         JwtService jwtService = mock(JwtService.class);
         RefreshTokenService refreshTokenService =
                 mock(RefreshTokenService.class);
@@ -59,7 +59,7 @@ class AuthEventPublisherTest {
                         "name", usuario.nombre(),
                         "microsoftId", "microsoft-id"
                 ));
-        when(mockUsuarioClient.findOrCreate(any(FindOrCreateUserRequest.class)))
+        when(usuarioServiceClient.findOrCreate(any(FindOrCreateUserRequest.class)))
                 .thenReturn(usuario);
         when(jwtService.generateToken(usuario)).thenReturn("access-token");
         when(jwtService.getExpirationSeconds()).thenReturn(900L);
@@ -68,7 +68,7 @@ class AuthEventPublisherTest {
 
         AuthService authService = new AuthService(
                 microsoftOAuthService,
-                mockUsuarioClient,
+                usuarioServiceClient,
                 jwtService,
                 refreshTokenService,
                 otpService,
