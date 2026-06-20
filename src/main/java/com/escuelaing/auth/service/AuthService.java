@@ -8,7 +8,7 @@ import com.escuelaing.auth.exception.InvalidDomainException;
 import com.escuelaing.auth.exception.InvalidOtpException;
 import com.escuelaing.auth.exception.InvalidRefreshTokenException;
 import com.escuelaing.auth.messaging.AuthEventPublisher;
-import com.escuelaing.auth.mock.MockUsuarioClient;
+import com.escuelaing.auth.client.UsuarioServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,7 +24,7 @@ import java.util.UUID;
 public class AuthService {
 
     private final MicrosoftOAuthService microsoftOAuthService;
-    private final MockUsuarioClient mockUsuarioClient;
+    private final UsuarioServiceClient usuarioServiceClient;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final OtpService otpService;
@@ -44,7 +44,7 @@ public class AuthService {
             throw e;
         }
 
-        UsuarioResponse usuario = mockUsuarioClient.findOrCreate(
+        UsuarioResponse usuario = usuarioServiceClient.findOrCreate(
                 new FindOrCreateUserRequest(
                         email,
                         (String) microsoftUser.get("name"),
@@ -82,7 +82,7 @@ public class AuthService {
         }
 
         String normalized = email.toLowerCase();
-        UsuarioResponse usuario = mockUsuarioClient.findOrCreate(
+        UsuarioResponse usuario = usuarioServiceClient.findOrCreate(
                 new FindOrCreateUserRequest(
                         normalized,
                         deriveName(normalized),
@@ -107,7 +107,7 @@ public class AuthService {
             );
         }
 
-        UsuarioResponse usuario = mockUsuarioClient.findById(userId);
+        UsuarioResponse usuario = usuarioServiceClient.findById(userId);
 
         String newRefreshToken = refreshTokenService.rotate(
                 refreshToken,
