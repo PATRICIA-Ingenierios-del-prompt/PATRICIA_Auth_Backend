@@ -1,0 +1,38 @@
+
+jwt:
+  secret: test-secret-key-with-at-least-32-bytes!!
+  expiration-minutes: 15
+
+refresh:
+  expiration-days: 7
+
+otp:
+  length: 6
+  expiration-minutes: 5
+  max-attempts: 5
+  resend-cooldown-seconds: 60
+  secret: test-secret-key-with-at-least-32-bytes!!
+
+azure:
+  client-id: test-client-id
+  client-secret: test-client-secret
+  redirect-uri: http://localhost/callback
+  token-url: https://login.microsoftonline.com/common/oauth2/v2.0/token
+  jwks-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
+
+security:
+  allowed-domains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
+  internal-api-key: test-internal-key
+
+cors:
+  allowed-origins: http://localhost:3000
+
+messaging:
+  exchange: patricia.auth
+  usuarios-exchange: patricia.usuarios
+  queues:
+    usuarios-suspendidos: auth.usuarios-suspendidos
+    usuarios-baneados: auth.usuarios-baneados
+
+usuario-service:
+  url: http://localhost:9090

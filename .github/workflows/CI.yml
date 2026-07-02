@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # Integration tests (*IT) spin up Postgres through Testcontainers, which uses
+    # the Docker daemon preinstalled on ubuntu-latest. No GitHub service
+    # containers are needed — Testcontainers manages container lifecycle.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # Compiles, runs unit tests (Surefire, *Test) + Testcontainers
+      # integration tests (Failsafe, *IT), enforces the 80% coverage gate
+      # (-Pcoverage, unit + integration aggregated) and packages the jar.
+      - name: Build, test & coverage
+        run: mvn -B clean verify -Pcoverage
+
+      # -------------------------------------------------------------------------
+      # SonarCloud quality gate. Enable once the SonarCloud project + secrets
+      # are configured. A failing quality gate blocks the PR into develop.
+      # -------------------------------------------------------------------------
+      - name: Sonar analysis (branch)
+        if: github.event_name == 'push'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
+        run: |
+          mvn --batch-mode sonar:sonar \
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_BACKEND }} \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN_BACKEND }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=${GITHUB_WORKSPACE}/target/site/jacoco/jacoco.xml \
+            -Dsonar.java.binaries=target/classes \
+            -Dsonar.sources=src/main/java \
+            -Dsonar.tests=src/test/java \
+            -Dsonar.exclusions="**/EventsApplication.java" \
+            -Dsonar.coverage.exclusions="**/EventsApplication.java,**/dto/**,**/*Entity.java,**/*Mapper.java,**/config/**"
+
+      - name: Sonar analysis (pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mvn --batch-mode sonar:sonar \
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY_BACKEND }} \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN_BACKEND }} \
+            -Dsonar.coverage.jacoco.xmlReportPaths=${GITHUB_WORKSPACE}/target/site/jacoco/jacoco.xml \
+            -Dsonar.java.binaries=target/classes \
+            -Dsonar.sources=src/main/java \
+            -Dsonar.tests=src/test/java \
+            -Dsonar.exclusions="**/EventsApplication.java" \
+            -Dsonar.coverage.exclusions="**/EventsApplication.java,**/dto/**,**/*Entity.java,**/*Mapper.java,**/config/**" \
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
+            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+            -Dsonar.pullrequest.base=${{ github.base_ref }}
+
+      # Verifies the Dockerfile builds, so the CD pipeline is straightforward later.
+      - name: Build Docker image (verify Dockerfile works)
+        run: docker build -t patricia-events:ci .
