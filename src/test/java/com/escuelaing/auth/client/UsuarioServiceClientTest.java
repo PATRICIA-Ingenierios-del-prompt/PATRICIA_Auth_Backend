@@ -10,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.UUID;
@@ -38,17 +39,16 @@ class UsuarioServiceClientTest {
 
     @BeforeEach
     void setUp() {
-        // RestTemplate builder compatible con RestClient + MockRestServiceServer
-        org.springframework.web.client.RestTemplate restTemplate =
-                new org.springframework.web.client.RestTemplate();
+        RestTemplate restTemplate = new RestTemplate();
         server = MockRestServiceServer.bindTo(restTemplate).build();
-
+        // Se pasa RestClient construido sobre el RestTemplate mockeado
+        // → ejercita el constructor (líneas 37-39)
         RestClient restClient = RestClient.create(restTemplate);
         client = new UsuarioServiceClient(restClient, BASE_URL, API_KEY);
     }
 
     // -------------------------------------------------------------------------
-    // findOrCreate
+    // findOrCreate — camino feliz
     // -------------------------------------------------------------------------
 
     @Test
@@ -56,31 +56,50 @@ class UsuarioServiceClientTest {
         server.expect(requestTo(BASE_URL + "/internal/usuarios/find-or-create"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-Internal-Api-Key", API_KEY))
-                .andRespond(withSuccess(mapper.writeValueAsString(usuario), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(
+                        mapper.writeValueAsString(usuario), MediaType.APPLICATION_JSON));
 
         UsuarioResponse result = client.findOrCreate(
-                new FindOrCreateUserRequest("user@escuelaing.edu.co", "User", null)
-        );
+                new FindOrCreateUserRequest("user@escuelaing.edu.co", "User", null));
 
         assertThat(result.email()).isEqualTo("user@escuelaing.edu.co");
         assertThat(result.id()).isEqualTo(usuario.id());
         server.verify();
     }
 
+    // -------------------------------------------------------------------------
+    // findOrCreate — bloque catch (líneas 51-55)
+    // -------------------------------------------------------------------------
+
     @Test
-    void findOrCreate_throwsUsuarioServiceException_on5xxError() {
+    void findOrCreate_throwsUsuarioServiceException_onServerError() {
+        // withServerError() → 500 → RestClient lanza HttpServerErrorException
+        // (subclase de RestClientException) → se ejecuta el catch
         server.expect(requestTo(BASE_URL + "/internal/usuarios/find-or-create"))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withServerError());
 
         assertThatThrownBy(() -> client.findOrCreate(
-                new FindOrCreateUserRequest("user@escuelaing.edu.co", "User", null)
-        ))
+                new FindOrCreateUserRequest("user@escuelaing.edu.co", "User", null)))
+                .isInstanceOf(UsuarioServiceException.class)
+                .hasMessageContaining("find-or-create")
+                .hasCauseInstanceOf(org.springframework.web.client.RestClientException.class);
+    }
+
+    @Test
+    void findOrCreate_throwsUsuarioServiceException_on4xxError() {
+        // withBadRequest() → 400 → también RestClientException
+        server.expect(requestTo(BASE_URL + "/internal/usuarios/find-or-create"))
+                .andRespond(withBadRequest());
+
+        assertThatThrownBy(() -> client.findOrCreate(
+                new FindOrCreateUserRequest("x@escuelaing.edu.co", "X", null)))
                 .isInstanceOf(UsuarioServiceException.class)
                 .hasMessageContaining("find-or-create");
     }
 
     // -------------------------------------------------------------------------
-    // findById
+    // findById — camino feliz
     // -------------------------------------------------------------------------
 
     @Test
@@ -90,7 +109,8 @@ class UsuarioServiceClientTest {
         server.expect(requestTo(BASE_URL + "/internal/usuarios/" + userId))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("X-Internal-Api-Key", API_KEY))
-                .andRespond(withSuccess(mapper.writeValueAsString(usuario), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(
+                        mapper.writeValueAsString(usuario), MediaType.APPLICATION_JSON));
 
         UsuarioResponse result = client.findById(userId);
 
@@ -98,10 +118,26 @@ class UsuarioServiceClientTest {
         server.verify();
     }
 
+    // -------------------------------------------------------------------------
+    // findById — bloque catch (líneas 67-70)
+    // -------------------------------------------------------------------------
+
     @Test
-    void findById_throwsUsuarioServiceException_on5xxError() {
+    void findById_throwsUsuarioServiceException_onServerError() {
         server.expect(requestTo(BASE_URL + "/internal/usuarios/" + usuario.id()))
+                .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.findById(usuario.id().toString()))
+                .isInstanceOf(UsuarioServiceException.class)
+                .hasMessageContaining("findById")
+                .hasCauseInstanceOf(org.springframework.web.client.RestClientException.class);
+    }
+
+    @Test
+    void findById_throwsUsuarioServiceException_on4xxError() {
+        server.expect(requestTo(BASE_URL + "/internal/usuarios/" + usuario.id()))
+                .andRespond(withBadRequest());
 
         assertThatThrownBy(() -> client.findById(usuario.id().toString()))
                 .isInstanceOf(UsuarioServiceException.class)

@@ -29,16 +29,9 @@
     <!-- Clases sin lógica de negocio, generadas, o dependientes de   -->
     <!-- infraestructura externa no testeables de forma unitaria.     -->
     <!-- ============================================================ -->
-    <sonar.exclusions>
-      src/main/java/com/escuelaing/auth/AuthServiceApplication.java,
-      src/main/java/com/escuelaing/auth/config/**,
-      src/main/java/com/escuelaing/auth/dto/**,
-      src/main/java/com/escuelaing/auth/client/**,
-      src/main/java/com/escuelaing/auth/mock/**,
-      src/main/java/com/escuelaing/auth/service/OtpSender.java,
-      src/main/java/com/escuelaing/auth/service/MicrosoftOAuthService.java,
-      src/main/java/com/escuelaing/auth/exception/UsuarioServiceException.java
-    </sonar.exclusions>
+    <!-- Apunta a SonarCloud el reporte de JaCoCo -->
+
+
 
     <!-- Apunta a SonarCloud el reporte de JaCoCo -->
     <sonar.coverage.jacoco.xmlReportPaths>
