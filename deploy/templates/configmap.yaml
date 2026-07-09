@@ -1,0 +1,14 @@
+# Non-secret configuration. Secrets (JWT, Redis, MQ, Azure, internal API key)
+# come from the auth-secrets Secret synced by the ExternalSecret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-config
+  namespace: patricia-app
+data:
+  SERVER_PORT: {{ .Values.config.serverPort | quote }}
+  JWT_EXPIRATION_MINUTES: {{ .Values.config.jwtExpirationMinutes | quote }}
+  USUARIO_SERVICE_URL: {{ .Values.config.usuarioServiceUrl | quote }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
+  AZURE_REDIRECT_URI: {{ .Values.config.azureRedirectUri | quote }}
+  RABBITMQ_VHOST: {{ .Values.config.rabbitmqVhost | quote }}

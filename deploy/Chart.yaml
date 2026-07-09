@@ -1,0 +1,6 @@
+apiVersion: v2
+name: auth
+description: PATRICIA Auth MS (8081) — deployed by the CD job in .github/workflows/CI.yml on push to main
+type: application
+version: 0.1.0
+appVersion: "0.0.1"

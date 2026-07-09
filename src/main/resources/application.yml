@@ -10,6 +10,9 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
+      # Vacío en local (sin AUTH); en AWS, el token del ElastiCache Cluster #1
+      # llega como REDIS_PASSWORD vía External Secrets (deploy/templates/externalsecret.yaml).
+      password: ${REDIS_PASSWORD:}
 
   rabbitmq:
     host: ${RABBITMQ_HOST}

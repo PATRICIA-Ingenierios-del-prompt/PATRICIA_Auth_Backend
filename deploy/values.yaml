@@ -1,0 +1,42 @@
+# Defaults for the Auth MS chart. The CD job overrides image.repository and
+# image.tag per deploy (pinned to the commit SHA); everything else is edited
+# here and versioned with the code it configures.
+
+image:
+  repository: ""            # set by CD: <account>.dkr.ecr.<region>.amazonaws.com/patricia-auth
+  tag: ""                   # set by CD: short commit SHA
+  pullPolicy: IfNotPresent
+
+replicaCount: 1             # REST-only MS (no sockets): scale freely via HPA
+
+serviceAccount:
+  # IRSA role for the auth service: terraform output service_irsa_role_arns
+  roleArn: ""               # TODO: arn:aws:iam::<account>:role/patricia-<env>-auth-irsa
+
+config:
+  serverPort: "8081"
+  jwtExpirationMinutes: "60"
+  # K8s service DNS of the Users MS (same namespace)
+  usuarioServiceUrl: "http://users.patricia-app.svc.cluster.local:8082"
+  corsAllowedOrigins: "https://app.patricia.example"   # TODO: real frontend origin
+  azureRedirectUri: "https://app.patricia.example/auth/callback"  # TODO: real frontend callback
+  rabbitmqVhost: "/"
+
+# External Secrets Operator: remote keys in AWS Secrets Manager
+# (created by Ulink_Infra module.secrets; prefix = ${project_name}-${environment}).
+externalSecrets:
+  clusterSecretStore: patricia-aws-secrets-manager
+  prefix: "patricia-dev"    # TODO: match ${project_name}-${environment}
+  # NOTE for the infra repo: module.secrets does NOT yet create the
+  # auth-specific entry. Add `${prefix}/auth` in Secrets Manager with keys:
+  #   AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, INTERNAL_API_KEY
+  # The shared jwt-secret / cache-redis / amazon-mq entries already exist.
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits:   { cpu: "1",  memory: 1Gi }
+
+hpa:
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
