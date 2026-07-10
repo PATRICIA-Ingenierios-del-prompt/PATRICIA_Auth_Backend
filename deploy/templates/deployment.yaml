@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: patricia-app
+  labels: { app: auth }
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Auth is stateless REST (no long-lived connections to protect), so the
+  # default rolling update (25%/25%) is fine — unlike Gateway, no
+  # maxUnavailable:0 override needed here.
+  selector:
+    matchLabels: { app: auth }
+  template:
+    metadata:
+      labels: { app: auth }
+    spec:
+      serviceAccountName: auth
+      containers:
+        - name: auth
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef: { name: auth-config }
+            - secretRef:    { name: auth-secrets }
+          # Same slow-JVM-boot lesson learned from Gateway: startupProbe gives
+          # the app up to 150s to come up before readiness/liveness even start
+          # checking, so a cold start on Fargate never gets liveness-killed
+          # mid-boot. /actuator/health is the only actuator route permitted
+          # through Spring Security without auth (see SecurityConfig.java) —
+          # its subpaths (/liveness, /readiness) are NOT exempted, so probes
+          # must hit the exact /actuator/health path, same as Gateway.
+          startupProbe:
+            httpGet: { path: /actuator/health, port: 8081 }
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8081 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health, port: 8081 }
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

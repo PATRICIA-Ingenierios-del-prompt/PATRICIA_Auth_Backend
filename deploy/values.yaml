@@ -1,0 +1,72 @@
+# Defaults for the Auth MS chart. The CD job overrides image.repository and
+# image.tag per deploy (pinned to the commit SHA); everything else is edited
+# here and versioned with the code it configures.
+
+image:
+  repository: ""            # set by CD: <account>.dkr.ecr.<region>.amazonaws.com/patricia-dev/auth
+  tag: ""                   # set by CD: short commit SHA
+  pullPolicy: IfNotPresent
+
+# Stateless REST + OTP/session logic backed by Redis. 2 replicas for
+# availability; no PDB (unlike Gateway, Auth holds no long-lived connections
+# an admin-initiated drain would need to protect).
+replicaCount: 2
+
+serviceAccount:
+  roleArn: "" # TODO: arn:aws:iam::<account>:role/patricia-dev-auth-irsa if/when Auth needs IRSA (it doesn't today — no AWS SDK calls)
+
+config:
+  serverPort: "8081"
+  jwtExpirationMinutes: "60"
+  refreshExpirationDays: "7"
+  otpLength: "6"
+  otpExpirationMinutes: "5"
+  otpMaxAttempts: "5"
+  otpResendCooldownSeconds: "60"
+  allowedDomains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
+  corsAllowedOrigins: "https://app.patricia.example"   # TODO: real frontend origin
+  # K8s service DNS of the Users MS (same namespace/port convention as Gateway's chart).
+  # Users isn't deployed yet — that's fine, this URL is only called at request time
+  # (login/registration flows), never at Auth's own startup.
+  usuarioServiceUrl: "http://users.patricia-app.svc.cluster.local:8082"
+  azureRedirectUri: "https://u-link.duckdns.org/auth/microsoft/callback"  # TODO: confirm real callback path with frontend team
+
+# External Secrets Operator: remote keys in AWS Secrets Manager
+# (created by Ulink_Infra module.secrets; prefix = ${project_name}-${environment}).
+externalSecrets:
+  clusterSecretStore: patricia-aws-secrets-manager
+  prefix: "patricia-dev"
+  # NOTE on what's already provisioned in AWS Secrets Manager (confirmed via
+  # `aws secretsmanager list-secrets`) vs what still needs to be created:
+  #   patricia-dev/jwt-secret   -> EXISTS. Shared with Gateway: Auth signs, Gateway
+  #                                validates the same token, so this is the SAME
+  #                                entry, not a copy.
+  #   patricia-dev/amazon-mq    -> EXISTS. JSON keys are SPRING_RABBITMQ_ADDRESSES /
+  #                                SPRING_RABBITMQ_USERNAME / SPRING_RABBITMQ_PASSWORD
+  #                                (Spring Boot's own property-binding names — see
+  #                                templates/externalsecret.yaml for the property
+  #                                mapping, and the application.yml fix note below).
+  #   patricia-dev/cache-redis  -> EXISTS. JSON keys are REDIS_HOST / REDIS_PORT /
+  #                                REDIS_PASSWORD. (There's a second cluster,
+  #                                patricia-dev/backplane-redis — assumed to be for
+  #                                other services' WS pub-sub, NOT Auth. Confirm
+  #                                with the team if that assumption matters to you.)
+  #   azure-client-id / azure-client-secret / internal-api-key -> DO NOT EXIST YET.
+  #                                Not fatal: AzureProperties/JwtProperties have no
+  #                                @NotBlank/@Validated, so the pod boots fine with
+  #                                placeholder values (Microsoft login just won't
+  #                                work until these are real). Once created in AWS
+  #                                Secrets Manager, move AZURE_CLIENT_ID /
+  #                                AZURE_CLIENT_SECRET / INTERNAL_API_KEY from the
+  #                                ConfigMap (below) into externalsecret.yaml the
+  #                                same way JWT_SECRET / RabbitMQ / Redis are done.
+  
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits:   { cpu: "1",  memory: 1Gi }
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70

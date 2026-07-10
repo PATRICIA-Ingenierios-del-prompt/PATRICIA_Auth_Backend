@@ -1,0 +1,31 @@
+# Non-secret configuration. JWT_SECRET, RabbitMQ, and Redis credentials come
+# from the auth-secrets Secret synced by the ExternalSecret (see
+# externalsecret.yaml).
+#
+# TEMPORARY: AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / INTERNAL_API_KEY are
+# placeholders here because they don't exist in AWS Secrets Manager yet
+# (confirmed via `aws secretsmanager list-secrets` — only jwt-secret,
+# amazon-mq, and cache-redis exist for Auth today). The pod boots fine with
+# these placeholders (no @NotBlank/@Validated on AzureProperties), but
+# Microsoft login will not work until real values replace them. Once the
+# Azure AD app registration + a generated internal API key exist, create
+# them in AWS Secrets Manager and move these 3 keys into externalsecret.yaml
+# instead — do not leave real secret values in a ConfigMap long-term.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-config
+  namespace: patricia-app
+data:
+  SERVER_PORT: {{ .Values.config.serverPort | quote }}
+  JWT_EXPIRATION_MINUTES: {{ .Values.config.jwtExpirationMinutes | quote }}
+  REFRESH_EXPIRATION_DAYS: {{ .Values.config.refreshExpirationDays | quote }}
+  OTP_LENGTH: {{ .Values.config.otpLength | quote }}
+  OTP_EXPIRATION_MINUTES: {{ .Values.config.otpExpirationMinutes | quote }}
+  OTP_MAX_ATTEMPTS: {{ .Values.config.otpMaxAttempts | quote }}
+  OTP_RESEND_COOLDOWN_SECONDS: {{ .Values.config.otpResendCooldownSeconds | quote }}
+  ALLOWED_DOMAINS: {{ .Values.config.allowedDomains | quote }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
+  USUARIO_SERVICE_URL: {{ .Values.config.usuarioServiceUrl | quote }}
+  AZURE_REDIRECT_URI: {{ .Values.config.azureRedirectUri | quote }}
+  # --- placeholders, see note above ---
