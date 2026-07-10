@@ -11,7 +11,7 @@ spec:
     matchLabels: { app: auth }
   template:
     metadata:
-      labels: { app: auth }
+      labels: { app: auth, patricia.io/sg-tier: standard }
     spec:
       serviceAccountName: auth
       containers:
