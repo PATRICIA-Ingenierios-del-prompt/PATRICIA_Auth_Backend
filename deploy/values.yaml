@@ -62,8 +62,15 @@ externalSecrets:
   #                                same way JWT_SECRET / RabbitMQ / Redis are done.
   
 
+# requests.cpu bumped 250m -> 500m: on Fargate, requests.cpu (not limits.cpu)
+# is what actually gets provisioned as compute share for the pod. At 250m the
+# JVM was CPU-starved during boot (35s+ just to reach WebApplicationContext
+# init) and probe responses under that starvation were slow enough to trip
+# the startupProbe's 1s timeout even after the port was open, killing the pod
+# before Spring finished starting. memory.requests bumped in step to keep
+# headroom under the unchanged 1Gi limit.
 resources:
-  requests: { cpu: 250m, memory: 512Mi }
+  requests: { cpu: 500m, memory: 768Mi }
   limits:   { cpu: "1",  memory: 1Gi }
 
 hpa:
