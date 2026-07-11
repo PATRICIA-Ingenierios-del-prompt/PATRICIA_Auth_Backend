@@ -187,7 +187,7 @@ jobs:
             --namespace patricia-app \
             --set image.repository=${{ vars.ECR_REGISTRY }}/${{ env.IMAGE_NAME }} \
             --set image.tag=${{ needs.push-image.outputs.image_tag }} \
-            --wait --timeout 5m
+            --wait --timeout 10m
 
       - name: Smoke check
         run: |
