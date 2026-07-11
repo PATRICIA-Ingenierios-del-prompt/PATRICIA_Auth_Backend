@@ -29,7 +29,8 @@ config:
   # Users isn't deployed yet — that's fine, this URL is only called at request time
   # (login/registration flows), never at Auth's own startup.
   usuarioServiceUrl: "http://users.patricia-app.svc.cluster.local:8082"
-  azureRedirectUri: "https://u-link.duckdns.org/auth/microsoft/callback"  # TODO: confirm real callback path with frontend team
+  azureRedirectUri: "https://d2o13kfv3bj832.cloudfront.net/auth/callback"
+  corsAllowedOrigins: "https://d2o13kfv3bj832.cloudfront.net"
 
 # External Secrets Operator: remote keys in AWS Secrets Manager
 # (created by Ulink_Infra module.secrets; prefix = ${project_name}-${environment}).
