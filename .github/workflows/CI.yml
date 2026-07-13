@@ -119,17 +119,48 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
+<<<<<<< HEAD
+=======
+      # Idempotency check: ECR repos here have immutable tags, so re-running
+      # this job on a commit that was already pushed (e.g. workflow re-run,
+      # retry after a later step failed) would fail with "tag invalid ...
+      # cannot be overwritten". If the tag already exists, skip the build/push
+      # entirely — the existing image is reused as-is by the deploy job.
+      - name: Check if image tag already exists in ECR
+        id: check-image
+        run: |
+          if aws ecr describe-images \
+              --repository-name ${{ env.IMAGE_NAME }} \
+              --image-ids imageTag=${{ steps.meta.outputs.tag }} \
+              --region ${{ vars.AWS_REGION }} >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+>>>>>>> cf5c0181ea15beee4c9b0f8312fb346c536b0fed
       # NOTE: unlike an earlier version of Gateway's workflow, we do NOT also
       # push a movable branch-name tag (e.g. `:main`). ECR repos here have
       # immutable tags, so re-pushing `:main` on every commit fails with
       # "tag invalid ... cannot be overwritten". The SHA tag is the only one
       # deploys ever use, so the branch alias isn't needed.
       - name: Build and push
+<<<<<<< HEAD
+=======
+        if: steps.check-image.outputs.exists == 'false'
+>>>>>>> cf5c0181ea15beee4c9b0f8312fb346c536b0fed
         run: |
           IMAGE=${{ vars.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}
           docker build -t $IMAGE:${{ steps.meta.outputs.tag }} .
           docker push $IMAGE:${{ steps.meta.outputs.tag }}
 
+<<<<<<< HEAD
+=======
+      - name: Skip push (tag already exists)
+        if: steps.check-image.outputs.exists == 'true'
+        run: echo "Tag ${{ steps.meta.outputs.tag }} already exists in ${{ env.IMAGE_NAME }} — reusing existing image."
+
+>>>>>>> cf5c0181ea15beee4c9b0f8312fb346c536b0fed
   # ---------------------------------------------------------------------------
   # CD (§1.3): deploy to EKS on push to main ONLY.
   # `helm upgrade --wait` + readiness probes gate the rollout: if the new pods
@@ -165,7 +196,11 @@ jobs:
             --namespace patricia-app \
             --set image.repository=${{ vars.ECR_REGISTRY }}/${{ env.IMAGE_NAME }} \
             --set image.tag=${{ needs.push-image.outputs.image_tag }} \
+<<<<<<< HEAD
             --wait --timeout 5m
+=======
+            --wait --timeout 10m
+>>>>>>> cf5c0181ea15beee4c9b0f8312fb346c536b0fed
 
       - name: Smoke check
         run: |
@@ -178,4 +213,8 @@ jobs:
           kubectl run smoke-auth-$GITHUB_RUN_ID --namespace patricia-app \
             --image=curlimages/curl:8.8.0 --restart=Never --rm -i --quiet \
             --command -- curl -sf --retry 10 --retry-delay 6 --retry-all-errors \
+<<<<<<< HEAD
             http://auth.patricia-app.svc.cluster.local:8081/actuator/health
+=======
+            http://auth.patricia-app.svc.cluster.local:8081/actuator/health
+>>>>>>> cf5c0181ea15beee4c9b0f8312fb346c536b0fed

@@ -24,6 +24,9 @@ data:
   OTP_EXPIRATION_MINUTES: {{ .Values.config.otpExpirationMinutes | quote }}
   OTP_MAX_ATTEMPTS: {{ .Values.config.otpMaxAttempts | quote }}
   OTP_RESEND_COOLDOWN_SECONDS: {{ .Values.config.otpResendCooldownSeconds | quote }}
+  OTP_SENDER: {{ .Values.config.otpSender | quote }}
+  OTP_FROM_EMAIL: {{ .Values.config.otpFromEmail | quote }}
+  AWS_REGION: {{ .Values.config.awsRegion | quote }}
   ALLOWED_DOMAINS: {{ .Values.config.allowedDomains | quote }}
   CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
   USUARIO_SERVICE_URL: {{ .Values.config.usuarioServiceUrl | quote }}
