@@ -3,40 +3,91 @@
 # here and versioned with the code it configures.
 
 image:
-  repository: ""            # set by CD: <account>.dkr.ecr.<region>.amazonaws.com/patricia-auth
+  repository: ""            # set by CD: <account>.dkr.ecr.<region>.amazonaws.com/patricia-dev/auth
   tag: ""                   # set by CD: short commit SHA
   pullPolicy: IfNotPresent
 
-replicaCount: 1             # REST-only MS (no sockets): scale freely via HPA
+# Stateless REST + OTP/session logic backed by Redis. 2 replicas for
+# availability; no PDB (unlike Gateway, Auth holds no long-lived connections
+# an admin-initiated drain would need to protect).
+replicaCount: 2
 
 serviceAccount:
-  # IRSA role for the auth service: terraform output service_irsa_role_arns
-  roleArn: ""               # TODO: arn:aws:iam::<account>:role/patricia-<env>-auth-irsa
+  # Rol IRSA ya creado por module.eks (Ulink_Infra) para "auth", con la
+  # política ses:SendEmail adjuntada por module.ses. Sácalo con:
+  #   terraform output auth_ses_role_arn
+  roleArn: "" # TODO: arn:aws:iam::<account>:role/patricia-dev-auth-irsa
 
 config:
   serverPort: "8081"
   jwtExpirationMinutes: "60"
-  # K8s service DNS of the Users MS (same namespace)
-  usuarioServiceUrl: "http://users.patricia-app.svc.cluster.local:8082"
+  refreshExpirationDays: "7"
+  otpLength: "6"
+  otpExpirationMinutes: "5"
+  otpMaxAttempts: "5"
+  otpResendCooldownSeconds: "60"
+  # mock = loguea el código (default, dev/local). ses = envío real vía
+  # Amazon SES. Cambia a "ses" solo cuando serviceAccount.roleArn de arriba
+  # ya esté seteado con el rol real, o el pod arrancará sin poder autenticar
+  # contra AWS.
+  otpSender: "mock"
+  # Debe ser EXACTAMENTE el mismo email verificado en SES
+  # (var.ses_sender_email de Ulink_Infra: terraform output -raw ses -- o
+  # revisa el módulo module.ses). Si no coincide, SES rechaza el envío.
+  otpFromEmail: "no-reply@example.com" # TODO: el email verificado en SES
+  awsRegion: "us-east-1"
+  allowedDomains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
   corsAllowedOrigins: "https://app.patricia.example"   # TODO: real frontend origin
-  azureRedirectUri: "https://app.patricia.example/auth/callback"  # TODO: real frontend callback
-  rabbitmqVhost: "/"
+  # K8s service DNS of the Users MS (same namespace/port convention as Gateway's chart).
+  # Users isn't deployed yet — that's fine, this URL is only called at request time
+  # (login/registration flows), never at Auth's own startup.
+  usuarioServiceUrl: "http://users.patricia-app.svc.cluster.local:8082"
+  azureRedirectUri: "https://d2o13kfv3bj832.cloudfront.net/auth/callback"
+  corsAllowedOrigins: "https://d2o13kfv3bj832.cloudfront.net"
 
 # External Secrets Operator: remote keys in AWS Secrets Manager
 # (created by Ulink_Infra module.secrets; prefix = ${project_name}-${environment}).
 externalSecrets:
   clusterSecretStore: patricia-aws-secrets-manager
-  prefix: "patricia-dev"    # TODO: match ${project_name}-${environment}
-  # NOTE for the infra repo: module.secrets does NOT yet create the
-  # auth-specific entry. Add `${prefix}/auth` in Secrets Manager with keys:
-  #   AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, INTERNAL_API_KEY
-  # The shared jwt-secret / cache-redis / amazon-mq entries already exist.
+  prefix: "patricia-dev"
+  # NOTE on what's already provisioned in AWS Secrets Manager (confirmed via
+  # `aws secretsmanager list-secrets`) vs what still needs to be created:
+  #   patricia-dev/jwt-secret   -> EXISTS. Shared with Gateway: Auth signs, Gateway
+  #                                validates the same token, so this is the SAME
+  #                                entry, not a copy.
+  #   patricia-dev/amazon-mq    -> EXISTS. JSON keys are SPRING_RABBITMQ_ADDRESSES /
+  #                                SPRING_RABBITMQ_USERNAME / SPRING_RABBITMQ_PASSWORD
+  #                                (Spring Boot's own property-binding names — see
+  #                                templates/externalsecret.yaml for the property
+  #                                mapping, and the application.yml fix note below).
+  #   patricia-dev/cache-redis  -> EXISTS. JSON keys are REDIS_HOST / REDIS_PORT /
+  #                                REDIS_PASSWORD. (There's a second cluster,
+  #                                patricia-dev/backplane-redis — assumed to be for
+  #                                other services' WS pub-sub, NOT Auth. Confirm
+  #                                with the team if that assumption matters to you.)
+  #   azure-client-id / azure-client-secret / internal-api-key -> DO NOT EXIST YET.
+  #                                Not fatal: AzureProperties/JwtProperties have no
+  #                                @NotBlank/@Validated, so the pod boots fine with
+  #                                placeholder values (Microsoft login just won't
+  #                                work until these are real). Once created in AWS
+  #                                Secrets Manager, move AZURE_CLIENT_ID /
+  #                                AZURE_CLIENT_SECRET / INTERNAL_API_KEY from the
+  #                                ConfigMap (below) into externalsecret.yaml the
+  #                                same way JWT_SECRET / RabbitMQ / Redis are done.
+  
 
+# requests.cpu bumped 250m -> 500m: on Fargate, requests.cpu (not limits.cpu)
+# is what actually gets provisioned as compute share for the pod. At 250m the
+# JVM was CPU-starved during boot (35s+ just to reach WebApplicationContext
+# init) and probe responses under that starvation were slow enough to trip
+# the startupProbe's 1s timeout even after the port was open, killing the pod
+# before Spring finished starting. memory.requests bumped in step to keep
+# headroom under the unchanged 1Gi limit.
 resources:
-  requests: { cpu: 250m, memory: 512Mi }
+  requests: { cpu: 500m, memory: 768Mi }
   limits:   { cpu: "1",  memory: 1Gi }
 
 hpa:
-  minReplicas: 1
-  maxReplicas: 3
-  targetCPUUtilizationPercentage: 70
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70 

@@ -10,16 +10,13 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-      # Vacío en local (sin AUTH); en AWS, el token del ElastiCache Cluster #1
-      # llega como REDIS_PASSWORD vía External Secrets (deploy/templates/externalsecret.yaml).
-      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: true
 
   rabbitmq:
-    host: ${RABBITMQ_HOST}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER}
-    password: ${RABBITMQ_PASS}
-    virtual-host: ${RABBITMQ_VHOST:/}
+    addresses: ${SPRING_RABBITMQ_ADDRESSES}
+    username: ${SPRING_RABBITMQ_USERNAME}
+    password: ${SPRING_RABBITMQ_PASSWORD}
     publisher-confirm-type: correlated
     publisher-returns: true
 
@@ -40,6 +37,12 @@ otp:
   max-attempts: ${OTP_MAX_ATTEMPTS:5}
   resend-cooldown-seconds: ${OTP_RESEND_COOLDOWN_SECONDS:60}
   secret: ${OTP_SECRET:${JWT_SECRET}}
+  # mock (log, default) | ses (envio real via Amazon SES)
+  sender: ${OTP_SENDER:mock}
+  from-email: ${OTP_FROM_EMAIL:no-reply@example.com}
+
+aws:
+  region: ${AWS_REGION:us-east-1}
 
 
 azure:
@@ -65,3 +68,13 @@ messaging:
   queues:
     usuarios-suspendidos: auth.usuarios-suspendidos
     usuarios-baneados: auth.usuarios-baneados
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

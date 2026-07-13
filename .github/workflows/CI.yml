@@ -6,33 +6,22 @@ on:
   pull_request:
     branches: [develop, main]
 
-# Branch contract (see PATRICIA_Deployment_Runbook.txt §1.3):
-#   PRs      -> build + test + Sonar (quality gate blocks the merge)
-#   develop  -> build + test + Sonar + push image to ECR (no deploy)
-#   main     -> all of the above + helm deploy to EKS. Merging to main IS the
-#               deploy button — keep main protected with required reviews.
-#
-# Required repo configuration (Settings -> Secrets and variables -> Actions):
-#   secrets.AWS_CD_ROLE_ARN   IAM role assumed via GitHub OIDC (created in
-#                             Ulink_Infra; needs ECR push + eks:DescribeCluster
-#                             + an EKS access entry scoped to patricia-app)
-#   vars.AWS_REGION           e.g. us-east-1
-#   vars.ECR_REGISTRY         <account-id>.dkr.ecr.<region>.amazonaws.com
-#   vars.EKS_CLUSTER_NAME     terraform output -raw eks_cluster_name
-#   vars.API_BASE_URL         https://api.<domain> (for the post-deploy smoke check)
-#   secrets.SONAR_*           already in use below
-
 permissions:
   contents: read
   pull-requests: read
 
 env:
-  IMAGE_NAME: patricia-auth
+  # Debe coincidir con el path del repo ECR: <registry>/patricia-dev/auth
+  # (los repos ECR se llaman "${project}-${env}/${service}" = "patricia-dev/auth").
+  IMAGE_NAME: patricia-dev/auth
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    # Integration tests (*IT) spin up Postgres/Redis through Testcontainers, which
+    # uses the Docker daemon preinstalled on ubuntu-latest. No GitHub service
+    # containers are needed — Testcontainers manages container lifecycle.
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,12 +35,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Compiles, runs unit tests (Surefire, *Test) + integration tests
-      # (Failsafe, *IT), enforces the 80% coverage gate (-Pcoverage) and
-      # packages the jar.
       - name: Build, test & coverage
         run: mvn -B clean verify -Pcoverage
 
+      # -------------------------------------------------------------------------
+      # SonarCloud quality gate. Enable once the SonarCloud project + secrets
+      # are configured. A failing quality gate blocks the PR into develop.
+      # -------------------------------------------------------------------------
       - name: Sonar analysis (branch)
         if: github.event_name == 'push'
         env:
@@ -129,14 +119,38 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
+      # Idempotency check: ECR repos here have immutable tags, so re-running
+      # this job on a commit that was already pushed (e.g. workflow re-run,
+      # retry after a later step failed) would fail with "tag invalid ...
+      # cannot be overwritten". If the tag already exists, skip the build/push
+      # entirely — the existing image is reused as-is by the deploy job.
+      - name: Check if image tag already exists in ECR
+        id: check-image
+        run: |
+          if aws ecr describe-images \
+              --repository-name ${{ env.IMAGE_NAME }} \
+              --image-ids imageTag=${{ steps.meta.outputs.tag }} \
+              --region ${{ vars.AWS_REGION }} >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # NOTE: unlike an earlier version of Gateway's workflow, we do NOT also
+      # push a movable branch-name tag (e.g. `:main`). ECR repos here have
+      # immutable tags, so re-pushing `:main` on every commit fails with
+      # "tag invalid ... cannot be overwritten". The SHA tag is the only one
+      # deploys ever use, so the branch alias isn't needed.
       - name: Build and push
+        if: steps.check-image.outputs.exists == 'false'
         run: |
           IMAGE=${{ vars.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}
           docker build -t $IMAGE:${{ steps.meta.outputs.tag }} .
           docker push $IMAGE:${{ steps.meta.outputs.tag }}
-          # Movable branch alias (develop/main) for humans; deploys always pin the SHA tag.
-          docker tag $IMAGE:${{ steps.meta.outputs.tag }} $IMAGE:${GITHUB_REF_NAME}
-          docker push $IMAGE:${GITHUB_REF_NAME}
+
+      - name: Skip push (tag already exists)
+        if: steps.check-image.outputs.exists == 'true'
+        run: echo "Tag ${{ steps.meta.outputs.tag }} already exists in ${{ env.IMAGE_NAME }} — reusing existing image."
 
   # ---------------------------------------------------------------------------
   # CD (§1.3): deploy to EKS on push to main ONLY.
@@ -173,15 +187,17 @@ jobs:
             --namespace patricia-app \
             --set image.repository=${{ vars.ECR_REGISTRY }}/${{ env.IMAGE_NAME }} \
             --set image.tag=${{ needs.push-image.outputs.image_tag }} \
-            --wait --timeout 5m
+            --wait --timeout 10m
 
-      # Catches "ready but broken": the public health endpoint must answer
-      # through ALB -> NGINX -> Gateway -> Auth.
       - name: Smoke check
         run: |
-          for i in $(seq 1 10); do
-            curl -sf "${{ vars.API_BASE_URL }}/auth/health" && exit 0
-            sleep 6
-          done
-          echo "Smoke check failed: ${{ vars.API_BASE_URL }}/auth/health never answered 2xx"
-          exit 1
+          # Unlike Gateway, we always check in-cluster here, never the public
+          # URL: the public ingress routes /auth to the `gateway` Service (see
+          # Ulink_Infra/k8s/ingress-auth.yaml — backend is gateway, not auth),
+          # and Auth has no actuator path exposed under the /auth/** prefix.
+          # Hitting API_BASE_URL/actuator/health would only re-check Gateway's
+          # own health, not prove Auth's pod is actually reachable.
+          kubectl run smoke-auth-$GITHUB_RUN_ID --namespace patricia-app \
+            --image=curlimages/curl:8.8.0 --restart=Never --rm -i --quiet \
+            --command -- curl -sf --retry 10 --retry-delay 6 --retry-all-errors \
+            http://auth.patricia-app.svc.cluster.local:8081/actuator/health
