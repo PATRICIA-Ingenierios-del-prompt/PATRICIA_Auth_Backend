@@ -13,7 +13,10 @@ image:
 replicaCount: 2
 
 serviceAccount:
-  roleArn: "" # TODO: arn:aws:iam::<account>:role/patricia-dev-auth-irsa if/when Auth needs IRSA (it doesn't today — no AWS SDK calls)
+  # Rol IRSA ya creado por module.eks (Ulink_Infra) para "auth", con la
+  # política ses:SendEmail adjuntada por module.ses. Sácalo con:
+  #   terraform output auth_ses_role_arn
+  roleArn: "" # TODO: arn:aws:iam::<account>:role/patricia-dev-auth-irsa
 
 config:
   serverPort: "8081"
@@ -23,6 +26,16 @@ config:
   otpExpirationMinutes: "5"
   otpMaxAttempts: "5"
   otpResendCooldownSeconds: "60"
+  # mock = loguea el código (default, dev/local). ses = envío real vía
+  # Amazon SES. Cambia a "ses" solo cuando serviceAccount.roleArn de arriba
+  # ya esté seteado con el rol real, o el pod arrancará sin poder autenticar
+  # contra AWS.
+  otpSender: "mock"
+  # Debe ser EXACTAMENTE el mismo email verificado en SES
+  # (var.ses_sender_email de Ulink_Infra: terraform output -raw ses -- o
+  # revisa el módulo module.ses). Si no coincide, SES rechaza el envío.
+  otpFromEmail: "no-reply@example.com" # TODO: el email verificado en SES
+  awsRegion: "us-east-1"
   allowedDomains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
   corsAllowedOrigins: "https://app.patricia.example"   # TODO: real frontend origin
   # K8s service DNS of the Users MS (same namespace/port convention as Gateway's chart).
@@ -77,4 +90,4 @@ resources:
 hpa:
   minReplicas: 2
   maxReplicas: 4
-  targetCPUUtilizationPercentage: 70
+  targetCPUUtilizationPercentage: 70 

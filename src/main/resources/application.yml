@@ -37,6 +37,12 @@ otp:
   max-attempts: ${OTP_MAX_ATTEMPTS:5}
   resend-cooldown-seconds: ${OTP_RESEND_COOLDOWN_SECONDS:60}
   secret: ${OTP_SECRET:${JWT_SECRET}}
+  # mock (log, default) | ses (envio real via Amazon SES)
+  sender: ${OTP_SENDER:mock}
+  from-email: ${OTP_FROM_EMAIL:no-reply@example.com}
+
+aws:
+  region: ${AWS_REGION:us-east-1}
 
 
 azure:
