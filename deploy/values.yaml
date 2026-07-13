@@ -16,7 +16,7 @@ serviceAccount:
   # Rol IRSA ya creado por module.eks (Ulink_Infra) para "auth", con la
   # política ses:SendEmail adjuntada por module.ses. Sácalo con:
   #   terraform output auth_ses_role_arn
-  roleArn: "" # TODO: arn:aws:iam::<account>:role/patricia-dev-auth-irsa
+  roleArn: "arn:aws:iam::406103775000:role/patricia-dev-auth-irsa"
 
 config:
   serverPort: "8081"
@@ -30,14 +30,13 @@ config:
   # Amazon SES. Cambia a "ses" solo cuando serviceAccount.roleArn de arriba
   # ya esté seteado con el rol real, o el pod arrancará sin poder autenticar
   # contra AWS.
-  otpSender: "mock"
+  otpSender: "ses"
   # Debe ser EXACTAMENTE el mismo email verificado en SES
   # (var.ses_sender_email de Ulink_Infra: terraform output -raw ses -- o
   # revisa el módulo module.ses). Si no coincide, SES rechaza el envío.
-  otpFromEmail: "no-reply@example.com" # TODO: el email verificado en SES
+  otpFromEmail: "ulink_uni@outlook.com"
   awsRegion: "us-east-1"
   allowedDomains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
-  corsAllowedOrigins: "https://app.patricia.example"   # TODO: real frontend origin
   # K8s service DNS of the Users MS (same namespace/port convention as Gateway's chart).
   # Users isn't deployed yet — that's fine, this URL is only called at request time
   # (login/registration flows), never at Auth's own startup.
@@ -74,7 +73,7 @@ externalSecrets:
   #                                AZURE_CLIENT_SECRET / INTERNAL_API_KEY from the
   #                                ConfigMap (below) into externalsecret.yaml the
   #                                same way JWT_SECRET / RabbitMQ / Redis are done.
-  
+
 
 # requests.cpu bumped 250m -> 500m: on Fargate, requests.cpu (not limits.cpu)
 # is what actually gets provisioned as compute share for the pod. At 250m the
@@ -91,5 +90,4 @@ hpa:
   minReplicas: 2
   maxReplicas: 4
 
-  targetCPUUtilizationPercentage: 70 
-
+  targetCPUUtilizationPercentage: 70
