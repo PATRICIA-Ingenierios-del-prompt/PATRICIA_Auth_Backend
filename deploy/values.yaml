@@ -31,10 +31,15 @@ config:
   # ya esté seteado con el rol real, o el pod arrancará sin poder autenticar
   # contra AWS.
   otpSender: "ses"
-  # Debe ser EXACTAMENTE el mismo email verificado en SES
-  # (var.ses_sender_email de Ulink_Infra: terraform output -raw ses -- o
-  # revisa el módulo module.ses). Si no coincide, SES rechaza el envío.
-  otpFromEmail: "ulink_uni@outlook.com"
+  # Debe ser EXACTAMENTE la direccion configurada como var.ses_sender_email
+  # en Ulink_Infra (terraform output -> module.ses.sender_email). Desde que
+  # SES verifica el DOMINIO u-link.website (aws_ses_domain_identity + DKIM,
+  # ya no un solo correo suelto en outlook.com), cualquier direccion
+  # @u-link.website funciona como remitente -- esta es la que se eligio.
+  # IMPORTANTE: no cambies esto hasta confirmar en la consola de SES que
+  # u-link.website aparece como "Verified" con "DKIM: Successful" -- si
+  # cambias el remitente antes de eso, el envio empieza a fallar.
+  otpFromEmail: "noreply@u-link.website"
   awsRegion: "us-east-1"
   allowedDomains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
   # K8s service DNS of the Users MS (same namespace/port convention as Gateway's chart).
