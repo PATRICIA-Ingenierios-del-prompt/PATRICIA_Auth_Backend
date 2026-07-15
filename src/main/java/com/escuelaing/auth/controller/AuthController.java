@@ -36,6 +36,7 @@ public class AuthController {
     ) {
         return authService.loginMicrosoft(
                 request.code(),
+                request.redirectUri(),
                 clientIp(httpRequest)
         );
     }

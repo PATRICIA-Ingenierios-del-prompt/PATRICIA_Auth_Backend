@@ -53,7 +53,7 @@ class AuthEventPublisherTest {
                 "ACTIVE"
         );
 
-        when(microsoftOAuthService.authenticate("code"))
+        when(microsoftOAuthService.authenticate("code", null))
                 .thenReturn(Map.of(
                         "email", usuario.email(),
                         "name", usuario.nombre(),
@@ -76,7 +76,7 @@ class AuthEventPublisherTest {
                 eventPublisher
         );
 
-        authService.loginMicrosoft("code", "127.0.0.1");
+        authService.loginMicrosoft("code", null, "127.0.0.1");
 
         ArgumentCaptor<AuthEvent> eventCaptor =
                 ArgumentCaptor.forClass(AuthEvent.class);
