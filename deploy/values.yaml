@@ -13,10 +13,12 @@ image:
 replicaCount: 2
 
 serviceAccount:
-  # Rol IRSA ya creado por module.eks (Ulink_Infra) para "auth", con la
-  # política ses:SendEmail adjuntada por module.ses. Sácalo con:
-  #   terraform output auth_ses_role_arn
-  roleArn: "arn:aws:iam::406103775000:role/patricia-dev-auth-irsa"
+  # SES fue eliminado a favor de Resend (API key estático via ExternalSecret,
+  # no IRSA). El pod de Auth ya no usa ningún cliente del AWS SDK, así que no
+  # necesita rol IAM propio. Se deja vacío a propósito -- el template de
+  # serviceaccount.yaml omite la anotación eks.amazonaws.com/role-arn cuando
+  # roleArn está vacío.
+  roleArn: ""
 
 config:
   serverPort: "8081"
@@ -26,28 +28,26 @@ config:
   otpExpirationMinutes: "5"
   otpMaxAttempts: "5"
   otpResendCooldownSeconds: "60"
-  # mock = loguea el código (default, dev/local). ses = envío real vía
-  # Amazon SES. Cambia a "ses" solo cuando serviceAccount.roleArn de arriba
-  # ya esté seteado con el rol real, o el pod arrancará sin poder autenticar
-  # contra AWS.
-  otpSender: "ses"
-  # Debe ser EXACTAMENTE la direccion configurada como var.ses_sender_email
-  # en Ulink_Infra (terraform output -> module.ses.sender_email). Desde que
-  # SES verifica el DOMINIO u-link.website (aws_ses_domain_identity + DKIM,
-  # ya no un solo correo suelto en outlook.com), cualquier direccion
-  # @u-link.website funciona como remitente -- esta es la que se eligio.
-  # IMPORTANTE: no cambies esto hasta confirmar en la consola de SES que
-  # u-link.website aparece como "Verified" con "DKIM: Successful" -- si
-  # cambias el remitente antes de eso, el envio empieza a fallar.
+  # mock = loguea el código (default, dev/local). resend = envío real vía
+  # la API HTTP de Resend. Cambia a "resend" solo cuando exista el secret
+  # patricia-dev/auth con la key RESEND_API_KEY (ver externalSecrets abajo),
+  # o el pod arrancará con un api-key vacío y cada envío fallará en runtime
+  # con 401 de la API de Resend (no falla el arranque: RESEND_API_KEY no es
+  # @NotBlank).
+  otpSender: "resend"
+  # Debe ser una dirección de un dominio verificado en Resend (dashboard ->
+  # Domains -> u-link.website -> "Verified" con SPF/DKIM en verde).
+  # IMPORTANTE: no cambies esto hasta confirmar que el dominio aparece
+  # verificado en Resend -- si el remitente no pertenece a un dominio
+  # verificado, el envío falla.
   otpFromEmail: "noreply@u-link.website"
-  awsRegion: "us-east-1"
   allowedDomains: "@mail.escuelaing.edu.co,@escuelaing.edu.co"
   # K8s service DNS of the Users MS (same namespace/port convention as Gateway's chart).
   # Users isn't deployed yet — that's fine, this URL is only called at request time
   # (login/registration flows), never at Auth's own startup.
   usuarioServiceUrl: "http://users.patricia-app.svc.cluster.local:8082"
-  azureRedirectUri: "https://d2o13kfv3bj832.cloudfront.net/auth/callback"
-  corsAllowedOrigins: "https://d2o13kfv3bj832.cloudfront.net"
+  azureRedirectUri: "https://www.ulinkapp.website/auth/callback"
+  corsAllowedOrigins: "https://www.ulinkapp.website"
 
 # External Secrets Operator: remote keys in AWS Secrets Manager
 # (created by Ulink_Infra module.secrets; prefix = ${project_name}-${environment}).
@@ -69,15 +69,19 @@ externalSecrets:
   #                                patricia-dev/backplane-redis — assumed to be for
   #                                other services' WS pub-sub, NOT Auth. Confirm
   #                                with the team if that assumption matters to you.)
-  #   azure-client-id / azure-client-secret / internal-api-key -> DO NOT EXIST YET.
-  #                                Not fatal: AzureProperties/JwtProperties have no
-  #                                @NotBlank/@Validated, so the pod boots fine with
-  #                                placeholder values (Microsoft login just won't
-  #                                work until these are real). Once created in AWS
-  #                                Secrets Manager, move AZURE_CLIENT_ID /
-  #                                AZURE_CLIENT_SECRET / INTERNAL_API_KEY from the
-  #                                ConfigMap (below) into externalsecret.yaml the
-  #                                same way JWT_SECRET / RabbitMQ / Redis are done.
+  #   patricia-dev/auth         -> single secret (JSON) with 4 keys, all pulled
+  #                                by templates/externalsecret.yaml:
+  #                                  AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+  #                                  INTERNAL_API_KEY (must match Users' copy),
+  #                                  RESEND_API_KEY (from resend.com dashboard ->
+  #                                  API Keys; needs "Sending access" only).
+  #                                Create/update it with:
+  #                                  aws secretsmanager put-secret-value \
+  #                                    --secret-id patricia-dev/auth \
+  #                                    --secret-string '{"AZURE_CLIENT_ID":"...",
+  #                                      "AZURE_CLIENT_SECRET":"...",
+  #                                      "INTERNAL_API_KEY":"...",
+  #                                      "RESEND_API_KEY":"re_..."}'
 
 
 # requests.cpu bumped 250m -> 500m: on Fargate, requests.cpu (not limits.cpu)

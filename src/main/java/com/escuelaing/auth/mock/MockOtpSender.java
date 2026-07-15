@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
  *
  * Registra el código en los logs en lugar de enviar un correo. Activa por
  * defecto (perfiles local/test) y también si {@code otp.sender} no se
- * define. En producción se reemplaza por {@link com.escuelaing.auth.email.SesOtpSender}
- * mediante {@code OTP_SENDER=ses}.
+ * define. En producción se reemplaza por {@link com.escuelaing.auth.email.ResendOtpSender}
+ * mediante {@code OTP_SENDER=resend}.
  */
 @Slf4j
 @Component

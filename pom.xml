@@ -22,8 +22,6 @@
     <spring-cloud.version>2023.0.3</spring-cloud.version>
     <jjwt.version>0.12.6</jjwt.version>
     <lombok.version>1.18.36</lombok.version>
-    <aws-sdk.version>2.28.29</aws-sdk.version>
-
 
     <sonar.exclusions>
       src/main/java/com/escuelaing/auth/AuthServiceApplication.java,
@@ -43,10 +41,6 @@
   </properties>
 
   <dependencies>
-    <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>sts</artifactId>
-    </dependency>
     <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-actuator</artifactId>
@@ -133,14 +127,6 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- AWS SES v2 - envío real de OTP por correo. Solo el cliente SES,
-         no el SDK completo. Credenciales via IRSA (rol IAM del
-         ServiceAccount de k8s), nunca claves estáticas. -->
-    <dependency>
-      <groupId>software.amazon.awssdk</groupId>
-      <artifactId>ses</artifactId>
-    </dependency>
-
     <!-- Test -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -156,13 +142,6 @@
         <groupId>org.springframework.cloud</groupId>
         <artifactId>spring-cloud-dependencies</artifactId>
         <version>${spring-cloud.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>software.amazon.awssdk</groupId>
-        <artifactId>bom</artifactId>
-        <version>${aws-sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
