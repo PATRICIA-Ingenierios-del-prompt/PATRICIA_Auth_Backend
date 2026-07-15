@@ -23,12 +23,12 @@ public class MicrosoftOAuthService {
     private final RestClient restClient;
     private final AzureProperties azureProperties;
 
-    public Map<String, Object> authenticate(String authorizationCode) {
+    public Map<String, Object> authenticate(String authorizationCode, String redirectUri) {
 
         log.info("Microsoft authentication started");
 
         MicrosoftTokenResponse response =
-                exchangeCodeForTokens(authorizationCode);
+                exchangeCodeForTokens(authorizationCode, redirectUri);
 
         Jwt jwt = validateMicrosoftIdToken(response.idToken());
 
@@ -45,7 +45,7 @@ public class MicrosoftOAuthService {
         );
     }
 
-    private MicrosoftTokenResponse exchangeCodeForTokens(String code) {
+    private MicrosoftTokenResponse exchangeCodeForTokens(String code, String redirectUri) {
 
         LinkedMultiValueMap<String, String> body =
                 new LinkedMultiValueMap<>();
@@ -58,7 +58,7 @@ public class MicrosoftOAuthService {
                 "authorization_code");
         body.add("code", code);
         body.add("redirect_uri",
-                azureProperties.getRedirectUri());
+                redirectUri != null ? redirectUri : azureProperties.getRedirectUri());
         body.add("scope",
                 "openid profile email");
 

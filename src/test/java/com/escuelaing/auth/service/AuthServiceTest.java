@@ -58,14 +58,14 @@ class AuthServiceTest {
 
     @Test
     void loginMicrosoft_returnsTokenResponse_onSuccess() {
-        when(microsoftOAuthService.authenticate("code123"))
+        when(microsoftOAuthService.authenticate("code123", null))
                 .thenReturn(Map.of("email", usuario.email(), "name", usuario.nombre(), "microsoftId", "ms-id"));
         when(usuarioServiceClient.findOrCreate(any())).thenReturn(usuario);
         when(jwtService.generateToken(usuario)).thenReturn("access-token");
         when(jwtService.getExpirationSeconds()).thenReturn(900L);
         when(refreshTokenService.create(userId.toString())).thenReturn("refresh-token");
 
-        TokenResponse response = authService.loginMicrosoft("code123", "10.0.0.1");
+        TokenResponse response = authService.loginMicrosoft("code123", null, "10.0.0.1");
 
         assertThat(response.accessToken()).isEqualTo("access-token");
         assertThat(response.refreshToken()).isEqualTo("refresh-token");
@@ -75,14 +75,14 @@ class AuthServiceTest {
 
     @Test
     void loginMicrosoft_publishesSesionIniciadaEvent() {
-        when(microsoftOAuthService.authenticate("code"))
+        when(microsoftOAuthService.authenticate("code", null))
                 .thenReturn(Map.of("email", usuario.email(), "name", usuario.nombre(), "microsoftId", "ms-id"));
         when(usuarioServiceClient.findOrCreate(any())).thenReturn(usuario);
         when(jwtService.generateToken(any())).thenReturn("token");
         when(jwtService.getExpirationSeconds()).thenReturn(900L);
         when(refreshTokenService.create(any())).thenReturn("refresh");
 
-        authService.loginMicrosoft("code", "192.168.1.1");
+        authService.loginMicrosoft("code", null, "192.168.1.1");
 
         ArgumentCaptor<AuthEvent> captor = ArgumentCaptor.forClass(AuthEvent.class);
         verify(eventPublisher).publish(eq("sesion.iniciada"), captor.capture());
@@ -94,14 +94,14 @@ class AuthServiceTest {
 
     @Test
     void loginMicrosoft_publishesSesionIniciadaWithoutIp_whenIpIsBlank() {
-        when(microsoftOAuthService.authenticate("code"))
+        when(microsoftOAuthService.authenticate("code", null))
                 .thenReturn(Map.of("email", usuario.email(), "name", usuario.nombre(), "microsoftId", "ms-id"));
         when(usuarioServiceClient.findOrCreate(any())).thenReturn(usuario);
         when(jwtService.generateToken(any())).thenReturn("token");
         when(jwtService.getExpirationSeconds()).thenReturn(900L);
         when(refreshTokenService.create(any())).thenReturn("refresh");
 
-        authService.loginMicrosoft("code", "  ");
+        authService.loginMicrosoft("code", null, "  ");
 
         ArgumentCaptor<AuthEvent> captor = ArgumentCaptor.forClass(AuthEvent.class);
         verify(eventPublisher).publish(eq("sesion.iniciada"), captor.capture());
@@ -110,12 +110,12 @@ class AuthServiceTest {
 
     @Test
     void loginMicrosoft_throwsInvalidDomainException_andPublishesAuthFailed() {
-        when(microsoftOAuthService.authenticate("code"))
+        when(microsoftOAuthService.authenticate("code", null))
                 .thenReturn(Map.of("email", "hacker@evil.com", "name", "H", "microsoftId", "x"));
         doThrow(new InvalidDomainException("Domain not allowed"))
                 .when(domainValidationService).validate("hacker@evil.com");
 
-        assertThatThrownBy(() -> authService.loginMicrosoft("code", "1.2.3.4"))
+        assertThatThrownBy(() -> authService.loginMicrosoft("code", null, "1.2.3.4"))
                 .isInstanceOf(InvalidDomainException.class);
 
         ArgumentCaptor<AuthEvent> captor = ArgumentCaptor.forClass(AuthEvent.class);

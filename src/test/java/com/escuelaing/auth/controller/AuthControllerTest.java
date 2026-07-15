@@ -50,7 +50,7 @@ class AuthControllerTest {
 
     @Test
     void loginMicrosoft_returns200_withTokens() throws Exception {
-        when(authService.loginMicrosoft(eq("auth-code"), anyString())).thenReturn(TOKEN);
+        when(authService.loginMicrosoft(eq("auth-code"), any(), anyString())).thenReturn(TOKEN);
 
         mockMvc.perform(post("/auth/login/microsoft")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -76,7 +76,7 @@ class AuthControllerTest {
 
     @Test
     void loginMicrosoft_extractsIpFromXForwardedFor() throws Exception {
-        when(authService.loginMicrosoft(eq("code"), eq("10.0.0.1"))).thenReturn(TOKEN);
+        when(authService.loginMicrosoft(eq("code"), any(), eq("10.0.0.1"))).thenReturn(TOKEN);
 
         mockMvc.perform(post("/auth/login/microsoft")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +86,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(authService).loginMicrosoft("code", "10.0.0.1");
+        verify(authService).loginMicrosoft(eq("code"), any(), eq("10.0.0.1"));
     }
 
     // -------------------------------------------------------------------------

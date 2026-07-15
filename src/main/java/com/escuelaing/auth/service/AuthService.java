@@ -31,10 +31,10 @@ public class AuthService {
     private final DomainValidationService domainValidationService;
     private final AuthEventPublisher eventPublisher;
 
-    public TokenResponse loginMicrosoft(String code, String ip) {
+    public TokenResponse loginMicrosoft(String code, String redirectUri, String ip) {
 
         Map<String, Object> microsoftUser =
-                microsoftOAuthService.authenticate(code);
+                microsoftOAuthService.authenticate(code, redirectUri);
         String email = (String) microsoftUser.get("email");
 
         try {
