@@ -1,6 +1,5 @@
 package com.escuelaing.auth.controller;
 
-import com.escuelaing.auth.config.CorsConfig;
 import com.escuelaing.auth.config.SecurityConfig;
 import com.escuelaing.auth.dto.response.TokenResponse;
 import com.escuelaing.auth.exception.GlobalExceptionHandler;
@@ -28,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, CorsConfig.class, InternalApiKeyFilter.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, InternalApiKeyFilter.class, GlobalExceptionHandler.class})
 @ActiveProfiles("test")
 class AuthControllerTest {
 

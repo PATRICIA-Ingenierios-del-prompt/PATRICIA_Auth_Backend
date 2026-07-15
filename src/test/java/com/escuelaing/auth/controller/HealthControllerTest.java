@@ -1,6 +1,5 @@
 package com.escuelaing.auth.controller;
 
-import com.escuelaing.auth.config.CorsConfig;
 import com.escuelaing.auth.config.SecurityConfig;
 import com.escuelaing.auth.security.InternalApiKeyFilter;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(HealthController.class)
-@Import({SecurityConfig.class, CorsConfig.class, InternalApiKeyFilter.class})
+@Import({SecurityConfig.class, InternalApiKeyFilter.class})
 @ActiveProfiles("test")
 class HealthControllerTest {
 
