@@ -55,10 +55,17 @@ public class MicrosoftOAuthService {
         body.add("grant_type",
                 "authorization_code");
         body.add("code", code);
-        body.add("redirect_uri",
-                redirectUri != null ? redirectUri : azureProperties.getRedirectUri());
+
+        String finalRedirectUri = redirectUri != null
+                ? redirectUri : azureProperties.getRedirectUri();
+        body.add("redirect_uri", finalRedirectUri);
         body.add("scope",
                 "openid profile email");
+
+        if (finalRedirectUri.startsWith("https://")) {
+            body.add("client_secret",
+                    azureProperties.getClientSecret());
+        }
 
         return restClient.post()
                 .uri(azureProperties.getTokenUrl())
