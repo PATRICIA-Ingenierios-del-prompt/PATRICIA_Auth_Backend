@@ -84,6 +84,7 @@ class MicrosoftOAuthServiceTest {
     void setUp() {
         azureProperties = new AzureProperties();
         azureProperties.setClientId(CLIENT_ID);
+        azureProperties.setClientSecret("test-client-secret");
         azureProperties.setRedirectUri("https://app.escuelaing.edu.co/callback");
         azureProperties.setTokenUrl(TOKEN_URL);
         azureProperties.setJwksUri(jwksUri);
