@@ -52,8 +52,6 @@ public class MicrosoftOAuthService {
 
         body.add("client_id",
                 azureProperties.getClientId());
-        body.add("client_secret",
-                azureProperties.getClientSecret());
         body.add("grant_type",
                 "authorization_code");
         body.add("code", code);
