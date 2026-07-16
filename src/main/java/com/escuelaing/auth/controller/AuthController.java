@@ -1,5 +1,6 @@
 package com.escuelaing.auth.controller;
 
+import com.escuelaing.auth.dto.request.JuradoLoginRequest;
 import com.escuelaing.auth.dto.request.LogoutRequest;
 import com.escuelaing.auth.dto.request.MicrosoftCodeRequest;
 import com.escuelaing.auth.dto.request.OtpRequestRequest;
@@ -37,6 +38,18 @@ public class AuthController {
         return authService.loginMicrosoft(
                 request.code(),
                 request.redirectUri(),
+                clientIp(httpRequest)
+        );
+    }
+
+    @PostMapping("/login/jurado")
+    public TokenResponse loginJurado(
+            @Valid @RequestBody JuradoLoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        return authService.loginJurado(
+                request.email(),
+                request.password(),
                 clientIp(httpRequest)
         );
     }
