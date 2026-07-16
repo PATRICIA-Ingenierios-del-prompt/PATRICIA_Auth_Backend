@@ -196,10 +196,8 @@
                 <exclude>com/escuelaing/auth/AuthServiceApplication.class</exclude>
                 <exclude>com/escuelaing/auth/config/**</exclude>
                 <exclude>com/escuelaing/auth/dto/**</exclude>
-                <exclude>com/escuelaing/auth/client/**</exclude>
                 <exclude>com/escuelaing/auth/mock/**</exclude>
                 <exclude>com/escuelaing/auth/service/OtpSender.class</exclude>
-                <exclude>com/escuelaing/auth/service/MicrosoftOAuthService.class</exclude>
               </excludes>
             </configuration>
           </execution>
@@ -230,8 +228,13 @@
                       que requieren contexto de aplicación completo para probarse.
                     - Son DTOs / Records / interfaces sin lógica de negocio.
                     - Son la clase main de Spring Boot (probada implícitamente).
-                    - Son clientes Feign generados automáticamente.
                     - Son mocks/fakes sólo para desarrollo local.
+
+                  UsuarioServiceClient (com/escuelaing/auth/client) y
+                  MicrosoftOAuthService ya NO están excluidos aquí: dejaron de
+                  ser un cliente Feign / código no testeable respectivamente, y
+                  ambos tienen su propio *Test.java con cobertura real
+                  (UsuarioServiceClientTest, MicrosoftOAuthServiceTest).
                 -->
 
                 <!-- Punto de entrada de la aplicación (clase raíz) -->
@@ -244,20 +247,11 @@
                 <!-- DTOs / Records / interfaces: sin lógica de negocio -->
                 <exclude>com/escuelaing/auth/dto/**</exclude>
 
-                <!-- Cliente Feign (interfaz generada por Spring Cloud OpenFeign) -->
-                <exclude>com/escuelaing/auth/client/**</exclude>
-
                 <!-- Mock de desarrollo local (no es código de producción real) -->
                 <exclude>com/escuelaing/auth/mock/**</exclude>
 
                 <!-- Interfaz OtpSender: contrato sin lógica propia -->
                 <exclude>com/escuelaing/auth/service/OtpSender.class</exclude>
-
-                <!-- MicrosoftOAuthService: depende de llamadas externas a Azure AD
-                     (intercambio de tokens y validación de JWKS). No es testeable
-                     de forma unitaria sin mockear infraestructura de Microsoft. -->
-                <exclude>com/escuelaing/auth/service/MicrosoftOAuthService.class</exclude>
-
 
               </excludes>
             </configuration>

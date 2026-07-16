@@ -227,6 +227,47 @@ class MicrosoftOAuthServiceTest {
         server.verify();
     }
 
+    @Test
+    void authenticate_includesClientSecret_whenRedirectUriIsHttps() throws Exception {
+        String idToken = buildIdToken(Map.of());
+
+        server.expect(requestTo(TOKEN_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "client_secret=test-client-secret")))
+                .andRespond(withSuccess(
+                        """
+                        {"token_type":"Bearer","scope":"openid profile email","expires_in":3600,"access_token":"a","id_token":"%s"}
+                        """.formatted(idToken),
+                        MediaType.APPLICATION_JSON
+                ));
+
+        service.authenticate("auth-code", "https://app.escuelaing.edu.co/callback");
+
+        server.verify();
+    }
+
+    @Test
+    void authenticate_omitsClientSecret_whenRedirectUriIsNotHttps() throws Exception {
+        // Esquema custom de una app móvil (public client, sin client_secret).
+        String idToken = buildIdToken(Map.of());
+
+        server.expect(requestTo(TOKEN_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("client_secret"))))
+                .andRespond(withSuccess(
+                        """
+                        {"token_type":"Bearer","scope":"openid profile email","expires_in":3600,"access_token":"a","id_token":"%s"}
+                        """.formatted(idToken),
+                        MediaType.APPLICATION_JSON
+                ));
+
+        service.authenticate("auth-code", "com.ulink.app://auth/callback");
+
+        server.verify();
+    }
+
     // -------------------------------------------------------------------------
     // authenticate - error paths
     // -------------------------------------------------------------------------
