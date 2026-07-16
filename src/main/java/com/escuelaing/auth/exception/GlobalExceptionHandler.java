@@ -31,6 +31,11 @@ public class GlobalExceptionHandler {
         return unauthorized(ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidJuradoCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidJuradoCredentials(InvalidJuradoCredentialsException ex) {
+        return unauthorized(ex.getMessage());
+    }
+
     @ExceptionHandler(OtpRequestException.class)
     public ResponseEntity<ErrorResponse> handleOtpRequest(OtpRequestException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(

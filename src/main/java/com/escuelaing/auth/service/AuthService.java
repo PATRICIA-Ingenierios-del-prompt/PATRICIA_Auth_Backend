@@ -5,6 +5,7 @@ import com.escuelaing.auth.dto.response.TokenResponse;
 import com.escuelaing.auth.dto.usuario.FindOrCreateUserRequest;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
 import com.escuelaing.auth.exception.InvalidDomainException;
+import com.escuelaing.auth.exception.InvalidJuradoCredentialsException;
 import com.escuelaing.auth.exception.InvalidOtpException;
 import com.escuelaing.auth.exception.InvalidRefreshTokenException;
 import com.escuelaing.auth.messaging.AuthEventPublisher;
@@ -55,6 +56,28 @@ public class AuthService {
         TokenResponse response = buildTokenResponse(usuario);
         publishSessionStarted(usuario, "MICROSOFT", ip);
         return response;
+    }
+
+    /**
+     * Login de jurado externo: correo + contraseña, sin validación de
+     * dominio institucional (a diferencia de Microsoft/OTP). Las
+     * credenciales viven en usuario-service (credenciales_jurado, cargadas
+     * manualmente por un admin); usuario-service crea el Usuario/Perfil en
+     * el primer login (mismo onboarding que cualquier usuario nuevo).
+     */
+    public TokenResponse loginJurado(String email, String password, String ip) {
+
+        String normalized = email.toLowerCase();
+
+        try {
+            UsuarioResponse usuario = usuarioServiceClient.loginJurado(normalized, password);
+            TokenResponse response = buildTokenResponse(usuario);
+            publishSessionStarted(usuario, "JURADO", ip);
+            return response;
+        } catch (InvalidJuradoCredentialsException e) {
+            publishAuthFailed(normalized, "CREDENCIALES_INVALIDAS", null);
+            throw e;
+        }
     }
 
     public void requestOtp(String email) {

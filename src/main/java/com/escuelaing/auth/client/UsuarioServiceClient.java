@@ -1,11 +1,14 @@
 package com.escuelaing.auth.client;
 
 import com.escuelaing.auth.dto.usuario.FindOrCreateUserRequest;
+import com.escuelaing.auth.dto.usuario.JuradoCredentialsRequest;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
+import com.escuelaing.auth.exception.InvalidJuradoCredentialsException;
 import com.escuelaing.auth.exception.UsuarioServiceException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -14,6 +17,7 @@ import org.springframework.web.client.RestClientException;
  *
  * Contratos consumidos (definidos por usuario-service, NO CAMBIAR):
  *   POST /internal/usuarios/find-or-create
+ *   POST /internal/usuarios/jurado/login
  *   GET  /internal/usuarios/{id}
  * autenticados con el header X-Internal-Api-Key.
  *
@@ -52,6 +56,29 @@ public class UsuarioServiceClient {
                     request.email(), e);
             throw new UsuarioServiceException(
                     "No fue posible comunicarse con usuario-service (find-or-create)", e
+            );
+        }
+    }
+
+    /**
+     * Login de jurado (correo + contraseña, sin restricción de dominio).
+     * 401 de usuario-service -> credenciales inválidas (correo no registrado
+     * o contraseña incorrecta); cualquier otro error -> falla de comunicación.
+     */
+    public UsuarioResponse loginJurado(String email, String password) {
+        try {
+            return restClient.post()
+                    .uri(baseUrl + "/internal/usuarios/jurado/login")
+                    .header(HEADER_API_KEY, internalApiKey)
+                    .body(new JuradoCredentialsRequest(email, password))
+                    .retrieve()
+                    .body(UsuarioResponse.class);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw new InvalidJuradoCredentialsException("Correo o contraseña incorrectos");
+        } catch (RestClientException e) {
+            log.error("Error llamando a usuario-service jurado/login para email={}", email, e);
+            throw new UsuarioServiceException(
+                    "No fue posible comunicarse con usuario-service (jurado/login)", e
             );
         }
     }
