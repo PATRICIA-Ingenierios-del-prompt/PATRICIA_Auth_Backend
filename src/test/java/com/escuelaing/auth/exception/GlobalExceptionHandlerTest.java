@@ -55,6 +55,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleInvalidJuradoCredentials_returnsUnauthorized() {
+        ResponseEntity<ErrorResponse> response =
+                handler.handleInvalidJuradoCredentials(
+                        new InvalidJuradoCredentialsException("Correo o contraseña incorrectos"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody().status()).isEqualTo(401);
+        assertThat(response.getBody().error()).isEqualTo("UNAUTHORIZED");
+        assertThat(response.getBody().message()).isEqualTo("Correo o contraseña incorrectos");
+    }
+
+    @Test
     void handleOtpRequest_returnsTooManyRequests() {
         ResponseEntity<ErrorResponse> response =
                 handler.handleOtpRequest(new OtpRequestException("wait a bit"));

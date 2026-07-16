@@ -6,6 +6,7 @@ import com.escuelaing.auth.dto.response.TokenResponse;
 import com.escuelaing.auth.dto.usuario.FindOrCreateUserRequest;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
 import com.escuelaing.auth.exception.InvalidDomainException;
+import com.escuelaing.auth.exception.InvalidJuradoCredentialsException;
 import com.escuelaing.auth.exception.InvalidOtpException;
 import com.escuelaing.auth.exception.InvalidRefreshTokenException;
 import com.escuelaing.auth.messaging.AuthEventPublisher;
@@ -121,6 +122,66 @@ class AuthServiceTest {
         ArgumentCaptor<AuthEvent> captor = ArgumentCaptor.forClass(AuthEvent.class);
         verify(eventPublisher).publish(eq("auth.fallido"), captor.capture());
         assertThat(captor.getValue().payload()).containsEntry("motivo", "DOMINIO_NO_PERMITIDO");
+    }
+
+    // -------------------------------------------------------------------------
+    // loginJurado
+    // -------------------------------------------------------------------------
+
+    @Test
+    void loginJurado_returnsTokenResponse_onSuccess() {
+        when(usuarioServiceClient.loginJurado("jurado@ejemplo.com", "secret"))
+                .thenReturn(usuario);
+        when(jwtService.generateToken(usuario)).thenReturn("access-token");
+        when(jwtService.getExpirationSeconds()).thenReturn(900L);
+        when(refreshTokenService.create(userId.toString())).thenReturn("refresh-token");
+
+        TokenResponse response = authService.loginJurado("jurado@ejemplo.com", "secret", "10.0.0.1");
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+    }
+
+    @Test
+    void loginJurado_normalizesEmailToLowercase() {
+        when(usuarioServiceClient.loginJurado("jurado@ejemplo.com", "secret"))
+                .thenReturn(usuario);
+        when(jwtService.generateToken(any())).thenReturn("t");
+        when(jwtService.getExpirationSeconds()).thenReturn(900L);
+        when(refreshTokenService.create(any())).thenReturn("r");
+
+        authService.loginJurado("Jurado@Ejemplo.com", "secret", "ip");
+
+        verify(usuarioServiceClient).loginJurado("jurado@ejemplo.com", "secret");
+    }
+
+    @Test
+    void loginJurado_publishesSesionIniciadaEvent_withMetodoJurado() {
+        when(usuarioServiceClient.loginJurado(any(), any())).thenReturn(usuario);
+        when(jwtService.generateToken(any())).thenReturn("t");
+        when(jwtService.getExpirationSeconds()).thenReturn(900L);
+        when(refreshTokenService.create(any())).thenReturn("r");
+
+        authService.loginJurado("jurado@ejemplo.com", "secret", "192.168.1.1");
+
+        ArgumentCaptor<AuthEvent> captor = ArgumentCaptor.forClass(AuthEvent.class);
+        verify(eventPublisher).publish(eq("sesion.iniciada"), captor.capture());
+        assertThat(captor.getValue().payload()).containsEntry("metodo", "JURADO");
+        assertThat(captor.getValue().payload()).containsEntry("ip", "192.168.1.1");
+    }
+
+    @Test
+    void loginJurado_throwsAndPublishesAuthFailed_whenCredentialsInvalid() {
+        doThrow(new InvalidJuradoCredentialsException("Correo o contraseña incorrectos"))
+                .when(usuarioServiceClient).loginJurado("jurado@ejemplo.com", "wrong");
+
+        assertThatThrownBy(() -> authService.loginJurado("jurado@ejemplo.com", "wrong", "ip"))
+                .isInstanceOf(InvalidJuradoCredentialsException.class);
+
+        ArgumentCaptor<AuthEvent> captor = ArgumentCaptor.forClass(AuthEvent.class);
+        verify(eventPublisher).publish(eq("auth.fallido"), captor.capture());
+        assertThat(captor.getValue().payload()).containsEntry("motivo", "CREDENCIALES_INVALIDAS");
+        assertThat(captor.getValue().payload()).containsEntry("email", "jurado@ejemplo.com");
     }
 
     // -------------------------------------------------------------------------

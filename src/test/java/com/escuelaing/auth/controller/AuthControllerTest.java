@@ -3,6 +3,7 @@ package com.escuelaing.auth.controller;
 import com.escuelaing.auth.config.SecurityConfig;
 import com.escuelaing.auth.dto.response.TokenResponse;
 import com.escuelaing.auth.exception.GlobalExceptionHandler;
+import com.escuelaing.auth.exception.InvalidJuradoCredentialsException;
 import com.escuelaing.auth.exception.InvalidOtpException;
 import com.escuelaing.auth.exception.InvalidRefreshTokenException;
 import com.escuelaing.auth.exception.OtpRequestException;
@@ -86,6 +87,59 @@ class AuthControllerTest {
                 .andExpect(status().isOk());
 
         verify(authService).loginMicrosoft(eq("code"), any(), eq("10.0.0.1"));
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /auth/login/jurado
+    // -------------------------------------------------------------------------
+
+    @Test
+    void loginJurado_returns200_withTokens() throws Exception {
+        when(authService.loginJurado(eq("jurado@ejemplo.com"), eq("secret"), anyString()))
+                .thenReturn(TOKEN);
+
+        mockMvc.perform(post("/auth/login/jurado")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"jurado@ejemplo.com","password":"secret"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+    }
+
+    @Test
+    void loginJurado_returns400_whenEmailIsInvalid() throws Exception {
+        mockMvc.perform(post("/auth/login/jurado")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"not-an-email","password":"secret"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginJurado_returns400_whenPasswordIsBlank() throws Exception {
+        mockMvc.perform(post("/auth/login/jurado")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"jurado@ejemplo.com","password":""}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void loginJurado_returns401_whenCredentialsAreInvalid() throws Exception {
+        doThrow(new InvalidJuradoCredentialsException("Correo o contraseña incorrectos"))
+                .when(authService).loginJurado(any(), any(), any());
+
+        mockMvc.perform(post("/auth/login/jurado")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"jurado@ejemplo.com","password":"wrong"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
     // -------------------------------------------------------------------------

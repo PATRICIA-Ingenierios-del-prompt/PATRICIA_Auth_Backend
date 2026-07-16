@@ -2,6 +2,7 @@ package com.escuelaing.auth.client;
 
 import com.escuelaing.auth.dto.usuario.FindOrCreateUserRequest;
 import com.escuelaing.auth.dto.usuario.UsuarioResponse;
+import com.escuelaing.auth.exception.InvalidJuradoCredentialsException;
 import com.escuelaing.auth.exception.UsuarioServiceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,6 +78,43 @@ class UsuarioServiceClientTest {
         ))
                 .isInstanceOf(UsuarioServiceException.class)
                 .hasMessageContaining("find-or-create");
+    }
+
+    // -------------------------------------------------------------------------
+    // loginJurado
+    // -------------------------------------------------------------------------
+
+    @Test
+    void loginJurado_returnsUsuario_onSuccess() throws Exception {
+        server.expect(requestTo(BASE_URL + "/internal/usuarios/jurado/login"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("X-Internal-Api-Key", API_KEY))
+                .andRespond(withSuccess(mapper.writeValueAsString(usuario), MediaType.APPLICATION_JSON));
+
+        UsuarioResponse result = client.loginJurado("user@escuelaing.edu.co", "secret");
+
+        assertThat(result.email()).isEqualTo("user@escuelaing.edu.co");
+        server.verify();
+    }
+
+    @Test
+    void loginJurado_throwsInvalidJuradoCredentialsException_on401() {
+        server.expect(requestTo(BASE_URL + "/internal/usuarios/jurado/login"))
+                .andRespond(withUnauthorizedRequest());
+
+        assertThatThrownBy(() -> client.loginJurado("jurado@ejemplo.com", "wrong"))
+                .isInstanceOf(InvalidJuradoCredentialsException.class)
+                .hasMessage("Correo o contraseña incorrectos");
+    }
+
+    @Test
+    void loginJurado_throwsUsuarioServiceException_on5xxError() {
+        server.expect(requestTo(BASE_URL + "/internal/usuarios/jurado/login"))
+                .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.loginJurado("jurado@ejemplo.com", "secret"))
+                .isInstanceOf(UsuarioServiceException.class)
+                .hasMessageContaining("jurado/login");
     }
 
     // -------------------------------------------------------------------------
